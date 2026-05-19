@@ -1,0 +1,36 @@
+from __future__ import annotations
+
+from fastapi import APIRouter, Request
+
+from app.schemas.chat import ChatRequest, ChatResponse
+from app.schemas.retrieval import RetrievedChunk, RetrievalResponse
+
+router = APIRouter(tags=["chat"])
+
+
+@router.post("/chat", response_model=ChatResponse)
+def chat(payload: ChatRequest, request: Request) -> ChatResponse:
+    result = request.app.state.rag_service.chat(
+        question=payload.question,
+        rag_mode=payload.rag_mode,
+        top_k=payload.top_k,
+    )
+    return ChatResponse(**result.__dict__)
+
+
+@router.get("/retrieve", response_model=RetrievalResponse)
+def retrieve(query: str, request: Request, top_k: int = 5) -> RetrievalResponse:
+    results = request.app.state.rag_service.retrieve(query, top_k=top_k)
+    return RetrievalResponse(
+        query=query,
+        mode="naive",
+        results=[
+            RetrievedChunk(
+                chunk_id=result.chunk.chunk_id,
+                text=result.chunk.text,
+                score=result.score,
+                metadata=result.chunk.metadata.to_dict(),
+            )
+            for result in results
+        ],
+    )
