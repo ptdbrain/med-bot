@@ -10,6 +10,12 @@
     "expected": "answerable"
   },
   {
+    "question": "So sanh dau hieu dot quy FAST va nguy co tim mach cua tang huyet ap.",
+    "expected_source": "stroke",
+    "expected": "answerable",
+    "rag_mode": "multi_query"
+  },
+  {
     "question": "Cau hoi nay khong co trong tai lieu nao?",
     "expected": "insufficient_context"
   },

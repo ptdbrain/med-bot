@@ -1,17 +1,41 @@
 services:
   backend:
-    build: .
+    build:
+      context: .
+      args:
+        INSTALL_AUDIO: ${INSTALL_AUDIO:-false}
+        INSTALL_RAG: ${INSTALL_RAG:-false}
+        INSTALL_FRONTEND: "false"
     env_file:
       - .env.example
+    environment:
+      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:4b}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-lexical}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-m3}
+      EMBEDDING_DEVICE: ${EMBEDDING_DEVICE:-cpu}
+      HF_HOME: /root/.cache/huggingface
+      VECTOR_STORE_PROVIDER: ${VECTOR_STORE_PROVIDER:-memory}
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-medtutor_chunks}
     ports:
       - "8000:8000"
     volumes:
       - ./data:/app/data
+      - hf_cache:/root/.cache/huggingface
     depends_on:
       - qdrant
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   frontend:
-    build: .
+    build:
+      context: .
+      args:
+        INSTALL_AUDIO: ${INSTALL_AUDIO:-false}
+        INSTALL_RAG: ${INSTALL_RAG:-false}
+        INSTALL_FRONTEND: "true"
     command: streamlit run frontend/streamlit_app.py --server.address 0.0.0.0 --server.port 8501
     environment:
       BACKEND_URL: http://backend:8000
@@ -31,3 +55,4 @@ services:
 
 volumes:
   qdrant_storage:
+  hf_cache:

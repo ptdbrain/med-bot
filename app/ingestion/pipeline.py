@@ -10,7 +10,7 @@ from app.ingestion.html_loader import HtmlLoader
 from app.ingestion.pdf_loader import PdfLoader
 from app.ingestion.text_loader import TextLoader
 from app.retrieval.metadata_store import SQLiteMetadataStore
-from app.retrieval.vector_store import InMemoryVectorStore
+from app.retrieval.vector_store import VectorStore
 from app.schemas.document import Chunk, Document
 from app.utils.file_utils import ALLOWED_DOCUMENT_EXTENSIONS, ensure_directory, validate_extension, validate_size
 
@@ -28,7 +28,7 @@ class IngestionPipeline:
     def __init__(
         self,
         settings: Settings,
-        vector_store: InMemoryVectorStore,
+        vector_store: VectorStore,
         metadata_store: SQLiteMetadataStore,
         chunker: TextChunker | None = None,
     ) -> None:
@@ -83,5 +83,6 @@ class IngestionPipeline:
         chunks = self.chunker.chunk(document)
         self.metadata_store.upsert_document(document)
         self.metadata_store.upsert_chunks(chunks)
+        self.metadata_store.upsert_parent_sections(chunks)
         self.vector_store.add_chunks(chunks)
         return chunks

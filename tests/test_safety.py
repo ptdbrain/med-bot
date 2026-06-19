@@ -21,6 +21,14 @@ def test_emergency_detector_allows_educational_stroke_question():
     assert result.is_emergency is False
 
 
+def test_emergency_detector_allows_educational_stroke_question_in_english():
+    detector = EmergencyDetector()
+
+    result = detector.check("What does FAST mean in stroke education?")
+
+    assert result.is_emergency is False
+
+
 def test_guardrail_blocks_prescription_or_diagnosis_request():
     guardrails = MedicalGuardrails()
 

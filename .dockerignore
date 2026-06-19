@@ -1,0 +1,16 @@
+.git
+.env
+.venv
+.venv-*
+__pycache__
+*.py[cod]
+.pytest_cache
+.ruff_cache
+data/raw
+data/processed
+data/indexes
+web/node_modules
+web/.next
+web/coverage
+web/playwright-report
+web/test-results

@@ -51,3 +51,19 @@ def test_chat_api_reports_insufficient_context_when_store_empty(tmp_path):
     payload = response.json()
     assert payload["sources"] == []
     assert "Tôi chưa tìm thấy thông tin này trong tài liệu đã được cung cấp." in payload["answer"]
+
+
+def test_retrieve_api_rejects_unknown_rag_mode(tmp_path):
+    client = TestClient(create_app(_test_settings(tmp_path)))
+
+    response = client.get(
+        "/retrieve",
+        params={
+            "query": "FAST",
+            "rag_mode": "unknown",
+            "top_k": 3,
+        },
+    )
+
+    assert response.status_code == 400
+    assert "RAG mode" in response.json()["detail"]

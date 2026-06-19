@@ -5,8 +5,8 @@ import urllib.request
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel, HttpUrl
 
-from app.ingestion.html_loader import HtmlLoader
-from app.utils.hashing import short_hash
+from app.jobs.crawler import validate_public_url
+from app.jobs.incremental_update import IncrementalUrlUpdater
 
 router = APIRouter(prefix="/ingest", tags=["ingest"])
 
@@ -27,14 +27,21 @@ async def ingest_file(request: Request, file: UploadFile = File(...)) -> dict:
 
 @router.post("/url")
 def ingest_url(payload: UrlIngestRequest, request: Request) -> dict:
+    url = str(payload.url)
     try:
-        with urllib.request.urlopen(str(payload.url), timeout=15) as response:
+        validate_public_url(url)
+        with urllib.request.urlopen(url, timeout=15) as response:
             content = response.read()
     except Exception as exc:  # pragma: no cover - network-dependent
         raise HTTPException(status_code=400, detail=f"Could not fetch URL: {exc}") from exc
 
-    filename = f"url-{short_hash(str(payload.url))}.html"
-    document = HtmlLoader().load(request.app.state.rag_service.settings.data_dir / "raw" / filename, content)
-    document.metadata["url"] = str(payload.url)
-    result = request.app.state.rag_service.pipeline.ingest_document(document)
-    return result.__dict__
+    try:
+        result = IncrementalUrlUpdater(
+            request.app.state.rag_service,
+        ).update_content(
+            url,
+            content,
+        )
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return result.to_dict()

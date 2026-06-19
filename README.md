@@ -15,17 +15,32 @@ Medical learners often have scattered notes, PDFs, guidelines, slides, images, a
 Implemented now:
 
 - Phase 1 naive text RAG.
+- Phase 2 hybrid retrieval using local vector similarity, Okapi BM25, and Reciprocal Rank Fusion.
+- Phase 3 reranking with a deterministic lexical reranker interface.
+- Phase 4 parent-child retrieval with persisted parent sections.
+- Phase 5 multi-query retrieval and RAG-Fusion.
+- Phase 9 rule-based agentic routing.
+- Phase 10 corrective retrieval with one query rewrite/retry.
+- Phase 11 incremental public-URL updates using persisted content hashes.
+- Phase 12 retrieval, answer, and safety evaluation with per-case audit details.
+- Optional real-model path using BGE-M3, Qdrant, and Qwen3 through Ollama.
 - Ingest `.txt`, `.md`, `.html`, `.pdf`, `.docx`.
 - Chunk with document metadata, section title, page marker support, timestamp, and hash.
 - Local vector-store fallback that works without Qdrant or embedding API keys.
 - SQLite metadata store.
 - Mock LLM provider that produces deterministic Vietnamese answers.
 - Citations/sources in every grounded answer.
+- Shared relevance gate that rejects dense nearest neighbors without a matching topic anchor.
 - Guardrails for emergency symptoms and diagnosis/prescription requests.
-- Mock image OCR/caption and mock audio STT boundaries.
-- FastAPI backend, Streamlit demo, sample data, Docker files, and tests.
+- Audio metadata validation, configurable STT providers, voice questions, and searchable lecture transcripts.
+- Provider-based image OCR/caption boundary with a deterministic mock default.
+- Audio questions, searchable audio lectures, and searchable video transcripts.
+- Document library API with listing, chunk counts, and index-aware deletion.
+- Functional Next.js research workspace plus a compatible Streamlit demo.
+- FastAPI backend, sample data, Docker files, and tests.
 
-Advanced RAG modes are scaffolded but intentionally not presented as complete yet. The MVP returns an explicit message if a non-`naive` mode is requested.
+Supported RAG modes are `naive`, `hybrid`, `rerank`, `parent_child`,
+`multi_query`, `corrective`, and `agentic`.
 
 ## Safety Scope
 
@@ -47,22 +62,28 @@ app/api/
   HTTP endpoints for health, ingest, chat, image, voice, and evaluation
 
 app/ingestion/
-  File loaders, mock media processors, chunking, and ingestion pipeline
+  File loaders, audio/STT processing, mock image processing, chunking, and ingestion pipeline
 
 app/retrieval/
-  Local vector fallback, SQLite metadata, BM25/reranker/query-transform boundaries
+  Local vector fallback, Qdrant dense store, SQLite metadata, BM25 and RRF
+
+app/embeddings/
+  Embedding provider interface and lazy sentence-transformers adapter
 
 app/rag/
-  Naive RAG service plus placeholders for later RAG modes
+  Naive, hybrid, rerank, parent-child, multi-query, corrective, and agentic routing
 
 app/llm/
-  LLM provider interface, mock provider, future OpenAI/local providers
+  LLM provider interface, mock provider, and Ollama adapter
 
 app/safety/
   Emergency detection, medical guardrails, policy text, PII redaction
 
 frontend/
   Streamlit demo
+
+web/
+  Primary Next.js research workspace for chat, ingest, documents, and evaluation
 
 data/sample/
   Fake medical education sample documents
@@ -73,15 +94,19 @@ data/sample/
 Implemented:
 
 - `naive`: retrieve top-k chunks from local vector fallback, generate answer from context, return sources.
+- `hybrid`: retrieve candidates from local vector similarity and Okapi BM25, merge them with Reciprocal Rank Fusion, then generate an answer with sources.
+- `rerank`: retrieve up to 20 hybrid candidates, rerank them, then generate from the selected top-k.
+- `parent_child`: search child chunks and expand the matching persisted section before generation.
+- `multi_query`: create deterministic query variants, retrieve each variant, and combine results with RRF.
+- `corrective`: validate token relevance, rewrite once when context is weak, and return the insufficient-context response if retry still fails.
+- `agentic`: route emergency requests to safety first, comparisons to multi-query, image-related questions to hybrid retrieval, and simple definitions to naive retrieval.
 
-Scaffolded for later phases:
+When real-model mode is enabled, the dense branch uses BGE-M3 vectors from
+Qdrant while the sparse branch remains BM25.
 
-- `hybrid`
-- `rerank`
-- `parent_child`
-- `multi_query`
-- `corrective`
-- `agentic`
+Before generation, every mode filters candidates against meaningful query
+terms. If no topic anchor remains, the service returns the insufficient-context
+message instead of sending unrelated nearest neighbors to the LLM.
 
 ## Local Setup
 
@@ -90,6 +115,22 @@ python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
+```
+
+The default `STT_PROVIDER=mock` needs no model download. For real local transcription:
+
+```bash
+pip install -r requirements-audio.txt
+```
+
+Then set:
+
+```env
+STT_PROVIDER=faster-whisper
+WHISPER_MODEL_SIZE=small
+WHISPER_DEVICE=cpu
+WHISPER_COMPUTE_TYPE=int8
+STT_LANGUAGE=vi
 ```
 
 Run the backend:
@@ -105,7 +146,114 @@ streamlit run frontend/streamlit_app.py
 ```
 
 Backend default: `http://localhost:8000`  
-Frontend default: `http://localhost:8501`
+Next.js frontend: `http://localhost:3000`
+Legacy Streamlit frontend: `http://localhost:8501`
+
+## Real-Model RAG
+
+Recommended local configuration:
+
+```text
+Embedding: BAAI/bge-m3
+Dense store: Qdrant
+Sparse retrieval: BM25
+Fusion: Reciprocal Rank Fusion
+Generator: qwen3:4b through Ollama
+```
+
+### 1. Start Ollama on Windows
+
+Ollama is installed outside WSL. Open PowerShell:
+
+```powershell
+ollama serve
+```
+
+Open another PowerShell window:
+
+```powershell
+ollama pull qwen3:4b
+ollama list
+```
+
+Ollama must respond at `http://localhost:11434`.
+
+### 2. Start Qdrant
+
+From the project root:
+
+```bash
+docker compose up -d qdrant
+curl http://localhost:6333/healthz
+```
+
+### 3. Install embedding dependencies
+
+```bash
+source .venv/bin/activate
+pip install -r requirements-rag.txt
+```
+
+This installs the CPU-only PyTorch wheel. The first ingest or search downloads
+`BAAI/bge-m3` from Hugging Face.
+
+### 4. Enable real-model mode
+
+Copy `.env.example` to `.env`, then set:
+
+```env
+LLM_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen3:4b
+OLLAMA_TIMEOUT_SECONDS=180
+
+EMBEDDING_PROVIDER=sentence-transformers
+EMBEDDING_MODEL=BAAI/bge-m3
+EMBEDDING_DEVICE=cpu
+EMBEDDING_DIMENSION=1024
+EMBEDDING_BATCH_SIZE=8
+
+VECTOR_STORE_PROVIDER=qdrant
+QDRANT_URL=http://localhost:6333
+QDRANT_COLLECTION=medtutor_chunks
+```
+
+Start FastAPI with the environment file:
+
+```bash
+uvicorn app.main:app --reload --env-file .env --port 8000
+```
+
+Start the Next.js frontend in another terminal:
+
+```bash
+cd web
+npm run dev
+```
+
+Open `http://localhost:3000/chat`.
+
+### 5. Ingest before asking questions
+
+```bash
+set -a
+source .env
+set +a
+python -m scripts.ingest_sample_data
+```
+
+Use `hybrid` mode in the chat interface. The request path is:
+
+```text
+query -> BGE-M3/Qdrant + BM25 -> RRF -> qwen3:4b -> cited answer
+```
+
+If chunks already exist in SQLite but Qdrant is new or was reset, rebuild the
+dense index without re-ingesting source files:
+
+```bash
+python -m scripts.reindex_vectors --clear
+```
 
 ## Docker
 
@@ -113,18 +261,29 @@ Frontend default: `http://localhost:8501`
 docker compose up --build
 ```
 
+To include `faster-whisper` and BGE-M3 dependencies in the Docker image:
+
+```bash
+INSTALL_AUDIO=true INSTALL_RAG=true docker compose up --build
+```
+
 Services:
 
 - Backend: `http://localhost:8000`
-- Frontend: `http://localhost:8501`
+- Legacy Streamlit frontend: `http://localhost:8501`
 - Qdrant: `http://localhost:6333`
 
-Phase 1 uses local vector fallback by default, so Qdrant is available for later integration but not required for the MVP path.
+The primary Next.js frontend is run separately from `web/` and is available at
+`http://localhost:3000`.
+
+Mock/lexical mode remains the default. Set `INSTALL_RAG=true`,
+`EMBEDDING_PROVIDER=sentence-transformers`, and
+`VECTOR_STORE_PROVIDER=qdrant` to enable the dense path in Docker.
 
 ## Ingest Sample Data
 
 ```bash
-python scripts/ingest_sample_data.py
+python -m scripts.ingest_sample_data
 ```
 
 Sample files cover:
@@ -145,6 +304,14 @@ curl -X POST http://localhost:8000/chat \
   -d '{"question":"FAST trong dot quy gom nhung dau hieu nao?","rag_mode":"naive","top_k":5}'
 ```
 
+Use hybrid retrieval:
+
+```bash
+curl -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"question":"FAST trong dot quy gom nhung dau hieu nao?","rag_mode":"hybrid","top_k":5}'
+```
+
 Expected response fields:
 
 - `answer`
@@ -159,12 +326,98 @@ If context is missing, the answer says:
 Tôi chưa tìm thấy thông tin này trong tài liệu đã được cung cấp.
 ```
 
+## Audio Processing
+
+Supported extensions:
+
+- `.wav`
+- `.mp3`
+- `.m4a`
+- `.ogg`
+
+Transcribe an audio file:
+
+```bash
+curl -X POST http://localhost:8000/voice/transcribe \
+  -F "file=@question.wav"
+```
+
+Ask RAG using an audio question:
+
+```bash
+curl -X POST "http://localhost:8000/voice/chat?rag_mode=hybrid&top_k=5" \
+  -F "file=@question.wav"
+```
+
+Ingest an audio lecture so its transcript becomes searchable:
+
+```bash
+curl -X POST http://localhost:8000/voice/ingest \
+  -F "file=@lecture.wav"
+```
+
+The audio pipeline is:
+
+```text
+upload validation
+  -> audio metadata inspection
+  -> configured STT provider
+  -> transcript and timestamped segments
+  -> question RAG or lecture chunking/indexing
+```
+
+WAV files are validated and include duration, sample rate, channel count, and sample width. Other formats rely on the configured STT provider for decoding.
+
+## Image And Video Processing
+
+Ingest an educational image:
+
+```bash
+curl -X POST http://localhost:8000/image/ingest \
+  -F "file=@infographic.png"
+```
+
+The image processor uses separate OCR and caption provider interfaces. The
+default implementation is deterministic and intended for local demos; a real
+OCR or vision provider can replace it without changing API routes.
+
+Ingest a lecture video:
+
+```bash
+curl -X POST http://localhost:8000/video/ingest \
+  -F "file=@lecture.mp4"
+```
+
+Supported video extensions are `.mp4`, `.mov`, `.mkv`, and `.webm`. The current
+MVP sends the uploaded media to the configured STT provider and indexes the
+resulting transcript. Keyframe extraction is intentionally not part of the
+basic path.
+
+## Document Library And URL Updates
+
+List indexed documents:
+
+```bash
+curl http://localhost:8000/documents
+```
+
+Delete one document, its raw upload, and its chunks from SQLite, BM25, and the
+active vector store:
+
+```bash
+curl -X DELETE http://localhost:8000/documents/<doc_id>
+```
+
+`POST /ingest/url` only accepts public HTTP/HTTPS sources. The backend stores a
+content hash per URL, skips unchanged pages, and replaces the previous indexed
+document when content changes.
+
 ## Evaluation
 
 Run:
 
 ```bash
-python scripts/run_eval.py
+python -m scripts.run_eval
 ```
 
 The evaluation dataset is at `app/evaluation/eval_dataset.json`.
@@ -178,6 +431,12 @@ Metrics included:
 - `insufficient_context_accuracy`
 - `safety_accuracy`
 
+`POST /eval/run` also returns per-question details for retrieval rank, citation,
+insufficient-context behavior, disclaimer presence, and the actual safety
+warning. The Next.js Evaluation page displays these checks as an audit table.
+`citation_rate` is measured only on answerable cases; safety-blocked and
+insufficient-context cases are expected to have no citations.
+
 ## Tests
 
 ```bash
@@ -189,7 +448,8 @@ Minimum tests cover:
 - Chunking and required metadata.
 - Emergency detection.
 - Diagnosis/prescription guardrails.
-- Local retrieval.
+- Local vector retrieval, Okapi BM25, and Reciprocal Rank Fusion.
+- WAV validation, STT provider selection, voice chat, and searchable lecture ingestion.
 - Chat API answer and sources.
 - Empty-context answer.
 
@@ -198,19 +458,22 @@ Minimum tests cover:
 - `GET /health`
 - `POST /ingest/file`
 - `POST /ingest/url`
+- `GET /documents`
+- `DELETE /documents/{doc_id}`
 - `POST /chat`
 - `GET /retrieve`
 - `POST /voice/transcribe`
 - `POST /voice/chat`
 - `POST /voice/ingest`
 - `POST /image/ingest`
+- `POST /video/ingest`
 - `POST /eval/run`
 
 ## Demo Script
 
 1. Start backend and frontend.
-2. Run `python scripts/ingest_sample_data.py`.
-3. Open Streamlit.
+2. Run `python -m scripts.ingest_sample_data`.
+3. Open the Next.js workspace at `http://localhost:3000/chat`.
 4. Ask: `FAST trong đột quỵ gồm những dấu hiệu nào?`
 5. Confirm the answer has citations and the medical disclaimer.
 6. Ask: `Hãy chẩn đoán bệnh và kê đơn thuốc cho tôi`.
@@ -229,23 +492,25 @@ Minimum tests cover:
 
 ## Roadmap
 
-1. Replace lexical vector fallback with sentence-transformers embeddings and Qdrant.
-2. Add true hybrid dense + BM25 search with Reciprocal Rank Fusion.
-3. Add reranking through a cross-encoder provider.
-4. Implement parent-child RAG for long PDFs/guidelines.
-5. Add multi-query and RAG-Fusion.
-6. Replace mock OCR/STT/captioner with provider adapters.
-7. Add video transcript ingestion with ffmpeg/moviepy.
-8. Add rule-based then LLM-assisted agentic routing.
-9. Add corrective retrieval and stronger answer faithfulness evaluation.
-10. Add scheduled public-URL update jobs.
+1. Build a labeled retrieval evaluation set for the collected corpus.
+2. Measure BGE-M3 + BM25 hybrid retrieval against the lexical baseline.
+3. Add reranking through a cross-encoder provider only if evaluation justifies it.
+4. Replace mock OCR/caption defaults with tested local or hosted providers.
+5. Add keyframe extraction for video when transcript-only evaluation shows a gap.
+6. Add a cross-encoder reranker adapter and compare it with the lexical baseline.
+7. Add APScheduler or cron deployment around the existing manual URL updater.
+8. Add answer-faithfulness and citation-entailment evaluation.
+9. Add authentication before exposing uploads outside a local/private environment.
 
 ## Current Limitations
 
-- No real embedding model is used in Phase 1; retrieval is deterministic lexical matching.
-- Qdrant is included in Docker but not wired into the default retrieval path yet.
+- Real embedding and Qdrant are optional; the default remains deterministic lexical matching.
+- BGE-M3 model download and CPU inference require additional disk, RAM, and startup time.
 - PDF/DOCX ingestion requires optional packages from `requirements.txt`.
-- Image and audio support are provider-boundary mocks in this phase.
+- Image OCR/caption defaults are still mock providers.
+- Audio defaults to mock STT unless the optional `faster-whisper` dependency and provider setting are enabled.
+- Video is transcript-only and depends on the configured STT provider.
+- The rule-based query transformer and reranker are deterministic baselines, not learned models.
 - The mock LLM summarizes retrieved chunks; it is not a clinical reasoning model.
 
 ## Medical Use Warning

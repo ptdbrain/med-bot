@@ -4,14 +4,33 @@ import json
 import math
 import re
 import unicodedata
+import uuid
 from collections import Counter
 from pathlib import Path
+from typing import Protocol
+from urllib.parse import quote
 
+import requests
+
+from app.embeddings.base import EmbeddingProvider
 from app.schemas.document import Chunk, SearchResult
 from app.utils.file_utils import ensure_directory
 
 
 TOKEN_PATTERN = re.compile(r"[a-zA-Z0-9_]+")
+
+
+class VectorStore(Protocol):
+    def add_chunks(self, chunks: list[Chunk]) -> None: ...
+
+    def delete_chunks(self, chunk_ids: list[str]) -> None: ...
+
+    def search(
+        self,
+        query: str,
+        top_k: int = 5,
+        min_score: float = 0.0,
+    ) -> list[SearchResult]: ...
 
 
 def normalize_text(text: str) -> str:
@@ -68,6 +87,17 @@ class InMemoryVectorStore:
             self._vectors[chunk.chunk_id] = Counter(tokenize(chunk.text))
         self.save()
 
+    def delete_chunks(self, chunk_ids: list[str]) -> None:
+        if not chunk_ids:
+            return
+        deleted = set(chunk_ids)
+        self._chunks = [
+            chunk for chunk in self._chunks if chunk.chunk_id not in deleted
+        ]
+        for chunk_id in deleted:
+            self._vectors.pop(chunk_id, None)
+        self.save()
+
     def search(self, query: str, top_k: int = 5, min_score: float = 0.0) -> list[SearchResult]:
         query_vector = Counter(tokenize(query))
         scored: list[SearchResult] = []
@@ -94,17 +124,128 @@ class InMemoryVectorStore:
 
 
 class QdrantVectorStore:
-    """Future Qdrant adapter boundary.
-
-    Phase 1 uses InMemoryVectorStore. This adapter exists so later work can add
-    Qdrant without changing API, ingestion, or RAG modules.
-    """
-
-    def __init__(self, url: str) -> None:
-        self.url = url
+    def __init__(
+        self,
+        url: str,
+        collection: str,
+        embedding_provider: EmbeddingProvider,
+        vector_size: int,
+        session=None,
+        timeout_seconds: int = 30,
+    ) -> None:
+        self.url = url.rstrip("/")
+        self.collection = collection
+        self.embedding_provider = embedding_provider
+        self.vector_size = vector_size
+        self.session = session or requests.Session()
+        self.timeout_seconds = timeout_seconds
+        self._ensure_collection()
 
     def add_chunks(self, chunks: list[Chunk]) -> None:
-        raise NotImplementedError("Qdrant storage is planned after the Phase 1 local fallback.")
+        if not chunks:
+            return
+        vectors = self.embedding_provider.embed_documents(
+            [chunk.text for chunk in chunks]
+        )
+        if len(vectors) != len(chunks):
+            raise RuntimeError(
+                "Embedding provider trả về số vector không khớp số chunk."
+            )
+        points = [
+            {
+                "id": str(uuid.uuid5(uuid.NAMESPACE_URL, chunk.chunk_id)),
+                "vector": vector,
+                "payload": {"chunk": chunk.to_dict()},
+            }
+            for chunk, vector in zip(chunks, vectors, strict=True)
+        ]
+        response = self.session.put(
+            f"{self._collection_url()}/points",
+            params={"wait": "true"},
+            json={"points": points},
+            timeout=self.timeout_seconds,
+        )
+        self._require_success(response, "upsert chunks")
 
     def search(self, query: str, top_k: int = 5, min_score: float = 0.0) -> list[SearchResult]:
-        raise NotImplementedError("Qdrant search is planned after the Phase 1 local fallback.")
+        vector = self.embedding_provider.embed_query(query)
+        response = self.session.post(
+            f"{self._collection_url()}/points/search",
+            json={
+                "vector": vector,
+                "limit": top_k,
+                "with_payload": True,
+                "score_threshold": min_score,
+            },
+            timeout=self.timeout_seconds,
+        )
+        self._require_success(response, "search")
+        results: list[SearchResult] = []
+        for item in response.json().get("result", []):
+            chunk_data = item.get("payload", {}).get("chunk")
+            if not chunk_data:
+                continue
+            results.append(
+                SearchResult(
+                    chunk=Chunk.from_dict(chunk_data),
+                    score=float(item.get("score", 0.0)),
+                )
+            )
+        return results
+
+    def delete_chunks(self, chunk_ids: list[str]) -> None:
+        if not chunk_ids:
+            return
+        point_ids = [
+            str(uuid.uuid5(uuid.NAMESPACE_URL, chunk_id))
+            for chunk_id in chunk_ids
+        ]
+        response = self.session.post(
+            f"{self._collection_url()}/points/delete",
+            params={"wait": True},
+            json={"points": point_ids},
+            timeout=self.timeout_seconds,
+        )
+        self._require_success(response, "delete chunks")
+
+    def clear(self) -> None:
+        response = self.session.delete(
+            self._collection_url(),
+            timeout=self.timeout_seconds,
+        )
+        if response.status_code not in {200, 404}:
+            self._require_success(response, "delete collection")
+        self._ensure_collection()
+
+    def _collection_url(self) -> str:
+        collection = quote(self.collection, safe="")
+        return f"{self.url}/collections/{collection}"
+
+    def _ensure_collection(self) -> None:
+        response = self.session.get(
+            self._collection_url(),
+            timeout=self.timeout_seconds,
+        )
+        if response.status_code == 200:
+            return
+        if response.status_code != 404:
+            self._require_success(response, "check collection")
+        response = self.session.put(
+            self._collection_url(),
+            json={
+                "vectors": {
+                    "size": self.vector_size,
+                    "distance": "Cosine",
+                }
+            },
+            timeout=self.timeout_seconds,
+        )
+        self._require_success(response, "create collection")
+
+    def _require_success(self, response, operation: str) -> None:
+        if 200 <= response.status_code < 300:
+            return
+        raise RuntimeError(
+            f"Qdrant {operation} thất bại tại {self.url}: "
+            f"HTTP {response.status_code} {response.text}"
+        )

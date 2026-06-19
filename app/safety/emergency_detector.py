@@ -18,7 +18,6 @@ DIRECT_EMERGENCY_KEYWORDS = {
     "tu tu",
     "tu sat",
     "co giat",
-    "stroke",
     "chest pain",
     "shortness of breath",
     "unconscious",

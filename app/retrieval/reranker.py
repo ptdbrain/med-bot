@@ -5,7 +5,7 @@ from app.schemas.document import SearchResult
 
 
 class LexicalReranker:
-    """Small deterministic reranker placeholder for Phase 3."""
+    """Deterministic local reranker used by the basic rerank pipeline."""
 
     def rerank(self, query: str, results: list[SearchResult], top_k: int = 5) -> list[SearchResult]:
         query_terms = set(tokenize(query))

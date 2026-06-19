@@ -1,40 +1,50 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
-from app.ingestion.audio_processor import AudioProcessor
-from app.utils.file_utils import ALLOWED_AUDIO_EXTENSIONS, validate_extension, validate_size
-
 router = APIRouter(prefix="/voice", tags=["voice"])
+
+
+def _raise_audio_error(exc: Exception) -> None:
+    status_code = 503 if isinstance(exc, RuntimeError) else 400
+    raise HTTPException(status_code=status_code, detail=str(exc)) from exc
 
 
 @router.post("/transcribe")
 async def transcribe_voice(request: Request, file: UploadFile = File(...)) -> dict:
     content = await file.read()
     try:
-        validate_size(content, request.app.state.rag_service.settings.max_upload_bytes)
-        validate_extension(file.filename or "", ALLOWED_AUDIO_EXTENSIONS)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    processor = AudioProcessor()
-    transcript = processor.stt.transcribe(file.filename or "audio.wav", content)
-    return {"transcript": transcript, "provider": "mock"}
+        transcription = request.app.state.rag_service.transcribe_audio(
+            file.filename or "audio.wav",
+            content,
+        )
+    except (RuntimeError, ValueError) as exc:
+        _raise_audio_error(exc)
+    payload = transcription.to_dict()
+    payload["transcript"] = transcription.text
+    return payload
 
 
 @router.post("/chat")
-async def voice_chat(request: Request, file: UploadFile = File(...), rag_mode: str = "naive") -> dict:
+async def voice_chat(
+    request: Request,
+    file: UploadFile = File(...),
+    rag_mode: str = "naive",
+    top_k: int = 5,
+) -> dict:
     content = await file.read()
     try:
-        validate_size(content, request.app.state.rag_service.settings.max_upload_bytes)
-        validate_extension(file.filename or "", ALLOWED_AUDIO_EXTENSIONS)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    transcript = AudioProcessor().stt.transcribe(file.filename or "audio.wav", content)
-    result = request.app.state.rag_service.chat(transcript, rag_mode=rag_mode)
-    payload = result.__dict__
-    payload["transcript"] = transcript
+        transcription, result = request.app.state.rag_service.voice_chat(
+            file.filename or "audio.wav",
+            content,
+            rag_mode=rag_mode,
+            top_k=top_k,
+        )
+    except (RuntimeError, ValueError) as exc:
+        _raise_audio_error(exc)
+    payload = dict(result.__dict__)
+    payload["transcript"] = transcription.text
+    payload["transcription"] = transcription.to_dict()
     return payload
 
 
@@ -42,14 +52,12 @@ async def voice_chat(request: Request, file: UploadFile = File(...), rag_mode: s
 async def ingest_audio_lecture(request: Request, file: UploadFile = File(...)) -> dict:
     content = await file.read()
     try:
-        validate_size(content, request.app.state.rag_service.settings.max_upload_bytes)
-        validate_extension(file.filename or "", ALLOWED_AUDIO_EXTENSIONS)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    audio_dir = request.app.state.rag_service.settings.data_dir / "raw" / "audio"
-    audio_dir.mkdir(parents=True, exist_ok=True)
-    path = audio_dir / Path(file.filename or "audio.wav").name
-    path.write_bytes(content)
-    document = AudioProcessor().load(path, content)
-    result = request.app.state.rag_service.pipeline.ingest_document(document)
-    return result.__dict__
+        result, transcription = request.app.state.rag_service.ingest_audio(
+            file.filename or "audio.wav",
+            content,
+        )
+    except (RuntimeError, ValueError) as exc:
+        _raise_audio_error(exc)
+    payload = dict(result.__dict__)
+    payload["transcription"] = transcription.to_dict()
+    return payload

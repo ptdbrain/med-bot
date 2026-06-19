@@ -11,5 +11,6 @@ def upload_limits() -> dict:
         "document_extensions": [".txt", ".md", ".pdf", ".docx", ".html", ".htm"],
         "image_extensions": [".png", ".jpg", ".jpeg"],
         "audio_extensions": [".wav", ".mp3", ".m4a", ".ogg"],
+        "video_extensions": [".mp4", ".mov", ".mkv", ".webm"],
         "max_upload_mb": 15,
     }

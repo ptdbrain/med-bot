@@ -4,7 +4,8 @@ from dataclasses import dataclass
 
 from app.llm.base import LLMProvider
 from app.llm.mock_llm import INSUFFICIENT_CONTEXT_MESSAGE
-from app.retrieval.vector_store import InMemoryVectorStore
+from app.retrieval.relevance import filter_relevant_results
+from app.retrieval.vector_store import VectorStore
 from app.safety.medical_guardrails import MedicalGuardrails
 from app.schemas.document import SearchResult
 
@@ -19,7 +20,7 @@ class RagOutput:
 class NaiveRAG:
     def __init__(
         self,
-        vector_store: InMemoryVectorStore,
+        vector_store: VectorStore,
         llm: LLMProvider,
         guardrails: MedicalGuardrails,
         min_score: float = 0.08,
@@ -34,7 +35,14 @@ class NaiveRAG:
         if not safety.allowed:
             return RagOutput(answer=safety.message or "", results=[], safety_warning=safety.safety_warning)
 
-        results = self.vector_store.search(question, top_k=top_k, min_score=self.min_score)
+        results = filter_relevant_results(
+            question,
+            self.vector_store.search(
+                question,
+                top_k=top_k,
+                min_score=self.min_score,
+            ),
+        )
         if not results:
             answer = self.guardrails.with_disclaimer(INSUFFICIENT_CONTEXT_MESSAGE)
             return RagOutput(answer=answer, results=[])

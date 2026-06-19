@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.schemas.retrieval import RetrievedChunk, RetrievalResponse
@@ -19,11 +19,18 @@ def chat(payload: ChatRequest, request: Request) -> ChatResponse:
 
 
 @router.get("/retrieve", response_model=RetrievalResponse)
-def retrieve(query: str, request: Request, top_k: int = 5) -> RetrievalResponse:
-    results = request.app.state.rag_service.retrieve(query, top_k=top_k)
+def retrieve(query: str, request: Request, top_k: int = 5, rag_mode: str = "naive") -> RetrievalResponse:
+    try:
+        results = request.app.state.rag_service.retrieve(
+            query,
+            top_k=top_k,
+            rag_mode=rag_mode,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return RetrievalResponse(
         query=query,
-        mode="naive",
+        mode=rag_mode,
         results=[
             RetrievedChunk(
                 chunk_id=result.chunk.chunk_id,

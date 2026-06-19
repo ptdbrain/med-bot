@@ -10,3 +10,11 @@ data/indexes/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !data/indexes/.gitkeep
+learning_mvp/chunks.json
+learning_mvp/index.json
+web/node_modules/
+web/.next/
+web/coverage/
+web/playwright-report/
+web/test-results/
+web/.next-start.*.log

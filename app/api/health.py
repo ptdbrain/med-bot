@@ -11,5 +11,5 @@ def health(request: Request) -> dict:
     return {
         "status": "ok",
         "service": "medtutor-rag-copilot",
-        "chunks_indexed": len(service.vector_store.chunks),
+        "chunks_indexed": service.indexed_chunk_count,
     }

@@ -24,6 +24,11 @@ class TextChunker:
         created_at = document.metadata.get("created_at") or datetime.now(timezone.utc).isoformat()
 
         for section_title, page_number, text in sections:
+            parent_key = (
+                f"{document.doc_id}:{section_title or '__document__'}:"
+                f"{page_number or 0}"
+            )
+            parent_id = f"parent-{short_hash(parent_key)}"
             for part in self._window(text):
                 cleaned = part.strip()
                 if not cleaned:
@@ -40,6 +45,7 @@ class TextChunker:
                     created_at=created_at,
                     hash=chunk_hash,
                     image_path=document.metadata.get("image_path"),
+                    parent_id=parent_id,
                     extra={k: v for k, v in document.metadata.items() if k not in {"created_at", "image_path"}},
                 )
                 chunks.append(Chunk(chunk_id=chunk_id, text=cleaned, metadata=metadata))
