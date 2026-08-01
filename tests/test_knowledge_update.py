@@ -33,15 +33,14 @@ def _service(root: Path) -> RAGService:
 
 class KnowledgeUpdateTests(unittest.TestCase):
     def test_public_url_validation_rejects_local_and_non_http_sources(self) -> None:
-        for url in {
+        for url in (
             "http://127.0.0.1/private",
             "http://localhost/private",
             "http://10.0.0.5/private",
             "file:///etc/passwd",
-        }:
-            with self.subTest(url=url):
-                with self.assertRaisesRegex(ValueError, "public HTTP"):
-                    validate_public_url(url)
+        ):
+            with self.subTest(url=url), self.assertRaisesRegex(ValueError, "public HTTP"):
+                validate_public_url(url)
 
         self.assertEqual(
             validate_public_url("https://example.org/guideline"),

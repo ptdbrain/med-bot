@@ -16,7 +16,6 @@ from app.embeddings.base import EmbeddingProvider
 from app.schemas.document import Chunk, SearchResult
 from app.utils.file_utils import ensure_directory
 
-
 TOKEN_PATTERN = re.compile(r"[a-zA-Z0-9_]+")
 
 
@@ -41,6 +40,19 @@ def normalize_text(text: str) -> str:
 
 def tokenize(text: str) -> list[str]:
     return TOKEN_PATTERN.findall(normalize_text(text))
+
+
+def chunk_search_text(chunk: Chunk) -> str:
+    metadata = chunk.metadata
+    return "\n".join(
+        value
+        for value in (
+            metadata.title,
+            metadata.section_title,
+            chunk.text,
+        )
+        if value
+    )
 
 
 def cosine_score(left: Counter[str], right: Counter[str]) -> float:
@@ -72,6 +84,10 @@ class InMemoryVectorStore:
     def chunks(self) -> list[Chunk]:
         return list(self._chunks)
 
+    @property
+    def count(self) -> int:
+        return len(self._chunks)
+
     def clear(self) -> None:
         self._chunks.clear()
         self._vectors.clear()
@@ -79,21 +95,22 @@ class InMemoryVectorStore:
             self.persist_path.unlink()
 
     def add_chunks(self, chunks: list[Chunk]) -> None:
-        known = {chunk.chunk_id for chunk in self._chunks}
+        positions = {chunk.chunk_id: index for index, chunk in enumerate(self._chunks)}
         for chunk in chunks:
-            if chunk.chunk_id in known:
-                continue
-            self._chunks.append(chunk)
-            self._vectors[chunk.chunk_id] = Counter(tokenize(chunk.text))
+            position = positions.get(chunk.chunk_id)
+            if position is None:
+                positions[chunk.chunk_id] = len(self._chunks)
+                self._chunks.append(chunk)
+            else:
+                self._chunks[position] = chunk
+            self._vectors[chunk.chunk_id] = Counter(tokenize(chunk_search_text(chunk)))
         self.save()
 
     def delete_chunks(self, chunk_ids: list[str]) -> None:
         if not chunk_ids:
             return
         deleted = set(chunk_ids)
-        self._chunks = [
-            chunk for chunk in self._chunks if chunk.chunk_id not in deleted
-        ]
+        self._chunks = [chunk for chunk in self._chunks if chunk.chunk_id not in deleted]
         for chunk_id in deleted:
             self._vectors.pop(chunk_id, None)
         self.save()
@@ -120,7 +137,7 @@ class InMemoryVectorStore:
             return
         payload = json.loads(self.persist_path.read_text(encoding="utf-8"))
         self._chunks = [Chunk.from_dict(item) for item in payload]
-        self._vectors = {chunk.chunk_id: Counter(tokenize(chunk.text)) for chunk in self._chunks}
+        self._vectors = {chunk.chunk_id: Counter(tokenize(chunk_search_text(chunk))) for chunk in self._chunks}
 
 
 class QdrantVectorStore:
@@ -144,13 +161,9 @@ class QdrantVectorStore:
     def add_chunks(self, chunks: list[Chunk]) -> None:
         if not chunks:
             return
-        vectors = self.embedding_provider.embed_documents(
-            [chunk.text for chunk in chunks]
-        )
+        vectors = self.embedding_provider.embed_documents([chunk_search_text(chunk) for chunk in chunks])
         if len(vectors) != len(chunks):
-            raise RuntimeError(
-                "Embedding provider trả về số vector không khớp số chunk."
-            )
+            raise RuntimeError("Embedding provider trả về số vector không khớp số chunk.")
         points = [
             {
                 "id": str(uuid.uuid5(uuid.NAMESPACE_URL, chunk.chunk_id)),
@@ -189,6 +202,9 @@ class QdrantVectorStore:
                 SearchResult(
                     chunk=Chunk.from_dict(chunk_data),
                     score=float(item.get("score", 0.0)),
+                    signals={
+                        "semantic_score": float(item.get("score", 0.0)),
+                    },
                 )
             )
         return results
@@ -196,10 +212,7 @@ class QdrantVectorStore:
     def delete_chunks(self, chunk_ids: list[str]) -> None:
         if not chunk_ids:
             return
-        point_ids = [
-            str(uuid.uuid5(uuid.NAMESPACE_URL, chunk_id))
-            for chunk_id in chunk_ids
-        ]
+        point_ids = [str(uuid.uuid5(uuid.NAMESPACE_URL, chunk_id)) for chunk_id in chunk_ids]
         response = self.session.post(
             f"{self._collection_url()}/points/delete",
             params={"wait": True},
@@ -246,6 +259,5 @@ class QdrantVectorStore:
         if 200 <= response.status_code < 300:
             return
         raise RuntimeError(
-            f"Qdrant {operation} thất bại tại {self.url}: "
-            f"HTTP {response.status_code} {response.text}"
+            f"Qdrant {operation} thất bại tại {self.url}: " f"HTTP {response.status_code} {response.text}"
         )

@@ -117,7 +117,7 @@ class QdrantVectorStoreTests(unittest.TestCase):
 
         self.assertEqual(
             embedding.document_calls,
-            [["FAST gồm méo miệng, yếu tay và nói khó."]],
+            [["Hướng dẫn đột quỵ\nFAST\nFAST gồm méo miệng, yếu tay và nói khó."]],
         )
         upsert = session.calls[1]
         self.assertEqual(upsert["method"], "PUT")

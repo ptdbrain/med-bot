@@ -15,8 +15,7 @@ def create_llm(settings: Settings) -> LLMProvider:
             base_url=settings.ollama_base_url,
             model=settings.ollama_model,
             timeout_seconds=settings.ollama_timeout_seconds,
+            think=settings.ollama_think,
+            num_predict=settings.ollama_num_predict,
         )
-    raise ValueError(
-        f"LLM_PROVIDER='{settings.llm_provider}' không hợp lệ. "
-        "Hỗ trợ: mock, ollama."
-    )
+    raise ValueError(f"LLM_PROVIDER='{settings.llm_provider}' không hợp lệ. " "Hỗ trợ: mock, ollama.")

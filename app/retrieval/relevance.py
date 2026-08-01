@@ -3,7 +3,6 @@ from __future__ import annotations
 from app.retrieval.vector_store import tokenize
 from app.schemas.document import SearchResult
 
-
 QUESTION_STOPWORDS = {
     "ai",
     "cai",
@@ -47,6 +46,7 @@ QUESTION_STOPWORDS = {
     "xin",
     "what",
 }
+SEMANTIC_RELEVANCE_THRESHOLD = 0.45
 
 
 def meaningful_query_terms(query: str) -> set[str]:
@@ -63,6 +63,10 @@ def filter_relevant_results(
 
     relevant: list[SearchResult] = []
     for result in results:
+        semantic_score = result.signals.get("semantic_score")
+        if semantic_score is not None and semantic_score >= SEMANTIC_RELEVANCE_THRESHOLD:
+            relevant.append(result)
+            continue
         metadata = result.chunk.metadata
         searchable = " ".join(
             filter(

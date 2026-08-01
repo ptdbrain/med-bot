@@ -6,13 +6,13 @@ from pathlib import Path
 
 from app.config import Settings
 from app.llm.mock_llm import INSUFFICIENT_CONTEXT_MESSAGE
-from app.rag.corrective_rag import CorrectiveRAG
 from app.rag.agentic_router import RuleBasedAgenticRouter
+from app.rag.corrective_rag import CorrectiveRAG
 from app.rag.multi_query_rag import MultiQueryRAG
 from app.rag.parent_child_rag import ParentChildRAG
 from app.rag.rerank_rag import RerankRAG
 from app.rag.service import RAGService
-from app.retrieval.reranker import LexicalReranker
+from app.retrieval.reranker import CrossEncoderReranker, LexicalReranker
 from app.safety.medical_guardrails import MedicalGuardrails
 from app.safety.policy import MEDICAL_DISCLAIMER
 from app.schemas.document import Chunk, ChunkMetadata, SearchResult
@@ -69,9 +69,7 @@ class AlwaysReturnsVectorStore:
 
     def delete_chunks(self, chunk_ids: list[str]) -> None:
         deleted = set(chunk_ids)
-        self.chunks = [
-            chunk for chunk in self.chunks if chunk.chunk_id not in deleted
-        ]
+        self.chunks = [chunk for chunk in self.chunks if chunk.chunk_id not in deleted]
 
     def search(
         self,
@@ -79,10 +77,7 @@ class AlwaysReturnsVectorStore:
         top_k: int = 5,
         min_score: float = 0.0,
     ) -> list[SearchResult]:
-        return [
-            SearchResult(chunk=chunk, score=0.9)
-            for chunk in self.chunks[:top_k]
-        ]
+        return [SearchResult(chunk=chunk, score=0.9) for chunk in self.chunks[:top_k]]
 
 
 class RecordingReranker:
@@ -241,12 +236,12 @@ class AdvancedRagTests(unittest.TestCase):
             )
             service.ingest_file(
                 "stroke.md",
-                "# FAST\n\nFAST gồm Face, Arm, Speech và Time.".encode("utf-8"),
+                "# FAST\n\nFAST gồm Face, Arm, Speech và Time.".encode(),
             )
 
             results = {
                 mode: service.chat("FAST là gì?", rag_mode=mode, top_k=2)
-                for mode in {
+                for mode in (
                     "naive",
                     "hybrid",
                     "rerank",
@@ -254,7 +249,7 @@ class AdvancedRagTests(unittest.TestCase):
                     "multi_query",
                     "corrective",
                     "agentic",
-                }
+                )
             }
 
         self.assertTrue(all(result.sources for result in results.values()))
@@ -281,9 +276,7 @@ class AdvancedRagTests(unittest.TestCase):
         self.assertEqual(result.sources, [])
 
     def test_agentic_router_treats_stroke_comparison_as_educational_query(self) -> None:
-        mode = RuleBasedAgenticRouter().choose_mode(
-            "So sánh FAST trong đột quỵ từ nhiều nguồn"
-        )
+        mode = RuleBasedAgenticRouter().choose_mode("So sánh FAST trong đột quỵ từ nhiều nguồn")
 
         self.assertEqual(mode, "multi_query")
 
@@ -299,7 +292,7 @@ class AdvancedRagTests(unittest.TestCase):
             )
             service.ingest_file(
                 "stroke.md",
-                "# FAST\n\nFAST gồm Face, Arm, Speech và Time.".encode("utf-8"),
+                "# FAST\n\nFAST gồm Face, Arm, Speech và Time.".encode(),
             )
 
             results = service.retrieve(
@@ -327,7 +320,7 @@ class AdvancedRagTests(unittest.TestCase):
                 (
                     "# FAST\n\nFAST gồm Face, Arm, Speech và Time. "
                     "Hoạt động thể chất phù hợp hỗ trợ sức khỏe và giáo dục y khoa."
-                ).encode("utf-8"),
+                ).encode(),
             )
 
             results = {
@@ -336,7 +329,7 @@ class AdvancedRagTests(unittest.TestCase):
                     rag_mode=mode,
                     top_k=2,
                 )
-                for mode in {
+                for mode in (
                     "naive",
                     "hybrid",
                     "rerank",
@@ -344,16 +337,11 @@ class AdvancedRagTests(unittest.TestCase):
                     "multi_query",
                     "corrective",
                     "agentic",
-                }
+                )
             }
 
         self.assertTrue(all(not result.sources for result in results.values()))
-        self.assertTrue(
-            all(
-                INSUFFICIENT_CONTEXT_MESSAGE in result.answer
-                for result in results.values()
-            )
-        )
+        self.assertTrue(all(INSUFFICIENT_CONTEXT_MESSAGE in result.answer for result in results.values()))
 
     def test_lexical_reranker_remains_usable_as_default(self) -> None:
         reranked = LexicalReranker().rerank(
@@ -363,6 +351,110 @@ class AdvancedRagTests(unittest.TestCase):
         )
 
         self.assertEqual(reranked[0].chunk.chunk_id, "stroke-1")
+
+    def test_lexical_reranker_rewards_topic_coverage_not_generic_overlap(self) -> None:
+        generic = SearchResult(
+            _chunk(
+                "generic",
+                "Metabolism is an important subject with many clinical roles.",
+                section="Overview",
+            ),
+            0.9,
+        )
+        specific = SearchResult(
+            _chunk(
+                "specific",
+                "Enzyme kinetics explains how enzymes regulate metabolic reactions.",
+                section="Enzyme kinetics",
+            ),
+            0.6,
+        )
+
+        reranked = LexicalReranker().rerank(
+            "enzyme kinetics metabolic reactions",
+            [generic, specific],
+            top_k=2,
+        )
+
+        self.assertEqual(reranked[0].chunk.chunk_id, "specific")
+        self.assertGreater(
+            reranked[0].signals["lexical_coverage"],
+            reranked[1].signals["lexical_coverage"],
+        )
+
+    def test_lexical_reranker_uses_dense_signal_for_cross_language_query(self) -> None:
+        semantic = SearchResult(
+            _chunk(
+                "semantic",
+                "Enzymes regulate metabolic reactions in cells.",
+                section="Enzyme kinetics",
+            ),
+            0.45,
+            {"semantic_score": 0.82, "dense_rank": 1.0},
+        )
+        lexical = SearchResult(
+            _chunk(
+                "lexical",
+                "Chất xúc tác sinh học là một mục từ trong bảng thuật ngữ.",
+                section="Glossary",
+            ),
+            0.9,
+            {"semantic_score": 0.70, "dense_rank": 20.0},
+        )
+
+        reranked = LexicalReranker().rerank(
+            "Chất xúc tác sinh học điều hòa phản ứng trong tế bào",
+            [lexical, semantic],
+            top_k=2,
+        )
+
+        self.assertEqual(reranked[0].chunk.chunk_id, "semantic")
+        self.assertEqual(reranked[0].signals["semantic_component"], 0.82)
+        self.assertEqual(reranked[0].signals["dense_rank_component"], 1.0)
+
+    def test_lexical_reranker_diversifies_near_duplicate_chunks(self) -> None:
+        first = SearchResult(
+            _chunk("enzyme-1", "Enzyme activity depends on pH and temperature."),
+            0.9,
+        )
+        duplicate = SearchResult(
+            _chunk("enzyme-2", "Enzyme activity depends on temperature and pH."),
+            0.89,
+        )
+        complementary = SearchResult(
+            _chunk("enzyme-3", "Competitive inhibitors increase apparent Km."),
+            0.75,
+        )
+
+        reranked = LexicalReranker(diversity_lambda=0.55).rerank(
+            "enzyme activity inhibitors",
+            [first, duplicate, complementary],
+            top_k=2,
+        )
+
+        self.assertEqual(
+            {result.chunk.chunk_id for result in reranked},
+            {"enzyme-1", "enzyme-3"},
+        )
+
+    def test_cross_encoder_reranker_uses_adapter_and_exposes_semantic_score(self) -> None:
+        class FakeCrossEncoder:
+            def predict(self, pairs, **kwargs):
+                assert len(pairs) == 2
+                return [-2.0, 3.0]
+
+        reranker = CrossEncoderReranker(
+            model_name="fake",
+            model=FakeCrossEncoder(),
+        )
+        reranked = reranker.rerank(
+            "enzyme regulation",
+            [self.first, self.second],
+            top_k=1,
+        )
+
+        self.assertEqual(reranked[0].chunk.chunk_id, "stroke-2")
+        self.assertGreater(reranked[0].signals["semantic_score"], 0.9)
 
 
 if __name__ == "__main__":

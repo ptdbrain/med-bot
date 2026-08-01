@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from collections import Counter
 
-from app.retrieval.vector_store import tokenize
+from app.retrieval.vector_store import chunk_search_text, tokenize
 from app.schemas.document import Chunk, SearchResult
 
 
@@ -22,7 +22,7 @@ class BM25Store:
             if chunk.chunk_id in known:
                 continue
             self._chunks.append(chunk)
-            self._tokens[chunk.chunk_id] = tokenize(chunk.text)
+            self._tokens[chunk.chunk_id] = tokenize(chunk_search_text(chunk))
             known.add(chunk.chunk_id)
 
     def replace_chunks(self, chunks: list[Chunk]) -> None:
@@ -58,9 +58,7 @@ class BM25Store:
                 inverse_document_frequency = math.log(
                     1 + (total_documents - doc_frequency + 0.5) / (doc_frequency + 0.5)
                 )
-                length_normalization = self.k1 * (
-                    1 - self.b + self.b * document_length / max(1.0, average_length)
-                )
+                length_normalization = self.k1 * (1 - self.b + self.b * document_length / max(1.0, average_length))
                 score += inverse_document_frequency * (
                     term_frequency * (self.k1 + 1) / (term_frequency + length_normalization)
                 )

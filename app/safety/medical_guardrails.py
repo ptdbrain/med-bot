@@ -6,7 +6,6 @@ from app.retrieval.vector_store import normalize_text
 from app.safety.emergency_detector import EmergencyDetector
 from app.safety.policy import MEDICAL_DISCLAIMER, PROHIBITED_MEDICAL_RESPONSE
 
-
 DIAGNOSIS_KEYWORDS = {
     "chan doan",
     "toi bi benh gi",

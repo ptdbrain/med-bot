@@ -46,7 +46,7 @@ class Chunk:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Chunk":
+    def from_dict(cls, data: dict[str, Any]) -> Chunk:
         return cls(
             chunk_id=data["chunk_id"],
             text=data["text"],
@@ -58,9 +58,11 @@ class Chunk:
 class SearchResult:
     chunk: Chunk
     score: float
+    signals: dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "chunk": self.chunk.to_dict(),
             "score": self.score,
+            "signals": self.signals,
         }

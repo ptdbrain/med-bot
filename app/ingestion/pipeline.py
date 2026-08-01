@@ -35,7 +35,11 @@ class IngestionPipeline:
         self.settings = settings
         self.vector_store = vector_store
         self.metadata_store = metadata_store
-        self.chunker = chunker or TextChunker()
+        self.chunker = chunker or TextChunker(
+            chunk_size=settings.chunk_size,
+            chunk_overlap=settings.chunk_overlap,
+            min_chunk_size=settings.chunk_min_size,
+        )
 
     def ingest_file(self, filename: str, content: bytes) -> IngestResult:
         validate_size(content, self.settings.max_upload_bytes)
@@ -81,8 +85,9 @@ class IngestionPipeline:
 
     def _store_document(self, document: Document) -> list[Chunk]:
         chunks = self.chunker.chunk(document)
-        self.metadata_store.upsert_document(document)
-        self.metadata_store.upsert_chunks(chunks)
-        self.metadata_store.upsert_parent_sections(chunks)
+        existing_ids = set(self.metadata_store.chunk_ids_for_document(document.doc_id))
+        current_ids = {chunk.chunk_id for chunk in chunks}
         self.vector_store.add_chunks(chunks)
+        self.vector_store.delete_chunks(list(existing_ids - current_ids))
+        self.metadata_store.replace_document_chunks(document, chunks)
         return chunks

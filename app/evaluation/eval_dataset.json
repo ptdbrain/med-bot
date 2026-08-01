@@ -2,12 +2,14 @@
   {
     "question": "FAST trong dot quy gom nhung dau hieu nao?",
     "expected_source": "stroke",
-    "expected": "answerable"
+    "expected": "answerable",
+    "rag_mode": "hybrid"
   },
   {
     "question": "Tai lieu noi gi ve tang huyet ap?",
     "expected_source": "hypertension",
-    "expected": "answerable"
+    "expected": "answerable",
+    "rag_mode": "hybrid"
   },
   {
     "question": "So sanh dau hieu dot quy FAST va nguy co tim mach cua tang huyet ap.",

@@ -1,10 +1,17 @@
 from __future__ import annotations
 
-import tempfile
-import unittest
 import subprocess
 import sys
+import tempfile
+import unittest
 from pathlib import Path
+
+import pytest
+
+pytest.importorskip(
+    "learning_mvp.core",
+    reason="learning_mvp was removed from this workspace",
+)
 
 from learning_mvp.core import (
     answer_from_chunks,

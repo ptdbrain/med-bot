@@ -29,10 +29,7 @@ class MultiQueryRAG:
         if not queries:
             return []
         candidate_k = max(top_k, top_k * self.candidate_multiplier)
-        result_lists = [
-            self.retriever.retrieve(query, top_k=candidate_k)
-            for query in queries
-        ]
+        result_lists = [self.retriever.retrieve(query, top_k=candidate_k) for query in queries]
         return reciprocal_rank_fusion(result_lists)[:top_k]
 
     def answer(self, question: str, top_k: int = 5) -> RagOutput:
@@ -54,8 +51,6 @@ class MultiQueryRAG:
                 results=[],
             )
         return RagOutput(
-            answer=self.guardrails.with_disclaimer(
-                self.llm.generate(question, results)
-            ),
+            answer=self.guardrails.with_disclaimer(self.llm.generate(question, results)),
             results=results,
         )

@@ -35,6 +35,9 @@ pythonpath = ["."]
 line-length = 120
 target-version = "py311"
 
+[tool.ruff.lint]
+ignore = ["B008"]
+
 [tool.black]
 line-length = 120
 target-version = ["py311"]

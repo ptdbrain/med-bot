@@ -4,7 +4,6 @@ from app.llm.base import LLMProvider
 from app.safety.policy import MEDICAL_DISCLAIMER
 from app.schemas.document import SearchResult
 
-
 INSUFFICIENT_CONTEXT_MESSAGE = "Tôi chưa tìm thấy thông tin này trong tài liệu đã được cung cấp."
 
 

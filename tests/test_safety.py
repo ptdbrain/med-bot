@@ -1,7 +1,7 @@
+from app.retrieval.vector_store import normalize_text
 from app.safety.emergency_detector import EmergencyDetector
 from app.safety.medical_guardrails import MedicalGuardrails
 from app.safety.policy import MEDICAL_DISCLAIMER
-from app.retrieval.vector_store import normalize_text
 
 
 def test_emergency_detector_recognizes_dangerous_symptoms():

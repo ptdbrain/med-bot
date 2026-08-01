@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from app.retrieval.vector_store import normalize_text
 from app.safety.policy import EMERGENCY_RESPONSE, MEDICAL_DISCLAIMER
 
-
 DIRECT_EMERGENCY_KEYWORDS = {
     "cap cuu",
     "dau nguc",

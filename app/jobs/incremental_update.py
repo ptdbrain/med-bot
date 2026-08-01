@@ -43,7 +43,7 @@ class UrlUpdateResult:
 class IncrementalUrlUpdater:
     def __init__(
         self,
-        service: "RAGService",
+        service: RAGService,
         crawler=None,
     ) -> None:
         self.service = service

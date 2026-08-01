@@ -1,8 +1,7 @@
 MEDICAL_DISCLAIMER = "Thông tin chỉ phục vụ học tập/tham khảo, không thay thế tư vấn của bác sĩ."
 
 EMERGENCY_RESPONSE = (
-    "Các dấu hiệu bạn mô tả có thể là tình huống nguy cấp. "
-    "Hãy liên hệ cấp cứu hoặc đến cơ sở y tế gần nhất ngay."
+    "Các dấu hiệu bạn mô tả có thể là tình huống nguy cấp. " "Hãy liên hệ cấp cứu hoặc đến cơ sở y tế gần nhất ngay."
 )
 
 PROHIBITED_MEDICAL_RESPONSE = (

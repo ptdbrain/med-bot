@@ -14,7 +14,7 @@ from app.ingestion.audio_processor import (
 )
 from app.ingestion.html_loader import HtmlLoader
 from app.ingestion.image_processor import ImageProcessor
-from app.ingestion.pipeline import IngestResult, IngestionPipeline
+from app.ingestion.pipeline import IngestionPipeline, IngestResult
 from app.ingestion.video_processor import VideoProcessor
 from app.llm.base import LLMProvider
 from app.llm.factory import create_llm
@@ -29,11 +29,11 @@ from app.retrieval.bm25_store import BM25Store
 from app.retrieval.factory import create_vector_store
 from app.retrieval.metadata_store import SQLiteMetadataStore
 from app.retrieval.query_transform import RuleBasedQueryTransformer
-from app.retrieval.reranker import LexicalReranker
+from app.retrieval.reranker_factory import create_reranker
 from app.retrieval.vector_store import VectorStore
-from app.schemas.document import SearchResult
 from app.safety.medical_guardrails import MedicalGuardrails
 from app.safety.pii_redaction import redact_pii
+from app.schemas.document import SearchResult
 from app.utils.file_utils import (
     ALLOWED_AUDIO_EXTENSIONS,
     ALLOWED_IMAGE_EXTENSIONS,
@@ -43,7 +43,6 @@ from app.utils.file_utils import (
     validate_size,
 )
 from app.utils.hashing import short_hash
-
 
 SUPPORTED_RAG_MODES = {
     "naive",
@@ -78,14 +77,10 @@ class RAGService:
         ensure_directory(self.settings.data_dir / "indexes")
         self.metadata_store = SQLiteMetadataStore(self.settings.metadata_db_path)
         self.embedding_provider = (
-            embedding_provider
-            if embedding_provider is not None
-            else create_embedding_provider(self.settings)
+            embedding_provider if embedding_provider is not None else create_embedding_provider(self.settings)
         )
         self.vector_store = (
-            vector_store
-            if vector_store is not None
-            else create_vector_store(self.settings, self.embedding_provider)
+            vector_store if vector_store is not None else create_vector_store(self.settings, self.embedding_provider)
         )
         self.pipeline = IngestionPipeline(self.settings, self.vector_store, self.metadata_store)
         self.guardrails = MedicalGuardrails()
@@ -97,13 +92,23 @@ class RAGService:
         self.bm25_store = BM25Store()
         self.bm25_store.add_chunks(self.metadata_store.list_chunks())
         self.naive_rag = NaiveRAG(self.vector_store, self.llm, self.guardrails)
-        self.hybrid_rag = HybridRAG(self.vector_store, self.bm25_store, self.llm, self.guardrails)
+        self.hybrid_rag = HybridRAG(
+            self.vector_store,
+            self.bm25_store,
+            self.llm,
+            self.guardrails,
+            candidate_multiplier=self.settings.hybrid_candidate_multiplier,
+            rrf_k=self.settings.hybrid_rrf_k,
+            dense_weight=self.settings.hybrid_dense_weight,
+            sparse_weight=self.settings.hybrid_sparse_weight,
+        )
         self.query_transformer = RuleBasedQueryTransformer()
         self.rerank_rag = RerankRAG(
             self.hybrid_rag,
-            LexicalReranker(),
+            create_reranker(self.settings),
             self.llm,
             self.guardrails,
+            candidate_k=self.settings.reranker_candidate_k,
         )
         self.parent_child_rag = ParentChildRAG(
             self.hybrid_rag,
@@ -128,6 +133,11 @@ class RAGService:
     @property
     def indexed_chunk_count(self) -> int:
         return self.metadata_store.count_chunks()
+
+    @property
+    def vector_indexed_count(self) -> int | None:
+        count = getattr(self.vector_store, "count", None)
+        return int(count) if count is not None else None
 
     def ingest_file(self, filename: str, content: bytes) -> IngestResult:
         result = self.pipeline.ingest_file(filename, content)
@@ -234,12 +244,10 @@ class RAGService:
                 f"RAG mode '{mode}' chưa được triển khai. "
                 f"Hiện hệ thống hỗ trợ: {', '.join(sorted(SUPPORTED_RAG_MODES))}."
             )
-            return ChatResult(answer=self.guardrails.with_disclaimer(message), sources=[], retrieved_chunks=[], mode_used=mode)
-        selected_mode = (
-            self.agentic_router.choose_mode(clean_question)
-            if mode == "agentic"
-            else mode
-        )
+            return ChatResult(
+                answer=self.guardrails.with_disclaimer(message), sources=[], retrieved_chunks=[], mode_used=mode
+            )
+        selected_mode = self.agentic_router.choose_mode(clean_question) if mode == "agentic" else mode
         output = self._rag_for_mode(selected_mode).answer(
             clean_question,
             top_k=top_k,

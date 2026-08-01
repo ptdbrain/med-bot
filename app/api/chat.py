@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Request
 
 from app.schemas.chat import ChatRequest, ChatResponse
-from app.schemas.retrieval import RetrievedChunk, RetrievalResponse
+from app.schemas.retrieval import RetrievalResponse, RetrievedChunk
 
 router = APIRouter(tags=["chat"])
 
@@ -37,6 +37,7 @@ def retrieve(query: str, request: Request, top_k: int = 5, rag_mode: str = "naiv
                 text=result.chunk.text,
                 score=result.score,
                 metadata=result.chunk.metadata.to_dict(),
+                signals=result.signals,
             )
             for result in results
         ],

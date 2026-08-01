@@ -53,3 +53,35 @@ def test_relevance_rejects_generic_overlap_without_topic_anchor() -> None:
     )
 
     assert filtered == []
+
+
+def test_relevance_accepts_cross_language_semantic_match() -> None:
+    english_context = _result(
+        "enzyme",
+        "Medical Biochemistry",
+        "Enzymes lower activation energy in metabolic reactions.",
+    )
+    english_context.signals["semantic_score"] = 0.82
+
+    filtered = filter_relevant_results(
+        "Enzyme có vai trò gì trong chuyển hóa?",
+        [english_context],
+    )
+
+    assert filtered == [english_context]
+
+
+def test_relevance_rejects_weak_semantic_match_without_lexical_anchor() -> None:
+    unrelated = _result(
+        "unrelated",
+        "Anatomy",
+        "The skeletal system provides structural support.",
+    )
+    unrelated.signals["semantic_score"] = 0.20
+
+    filtered = filter_relevant_results(
+        "Enzyme có vai trò gì trong chuyển hóa?",
+        [unrelated],
+    )
+
+    assert filtered == []

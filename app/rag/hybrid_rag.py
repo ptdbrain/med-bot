@@ -19,18 +19,29 @@ class HybridRAG:
         llm: LLMProvider,
         guardrails: MedicalGuardrails,
         candidate_multiplier: int = 4,
+        rrf_k: int = 60,
+        dense_weight: float = 1.0,
+        sparse_weight: float = 1.0,
     ) -> None:
         self.vector_store = vector_store
         self.bm25_store = bm25_store
         self.llm = llm
         self.guardrails = guardrails
         self.candidate_multiplier = candidate_multiplier
+        self.rrf_k = rrf_k
+        self.dense_weight = dense_weight
+        self.sparse_weight = sparse_weight
 
     def retrieve(self, question: str, top_k: int = 5) -> list[SearchResult]:
         candidate_k = max(top_k, top_k * self.candidate_multiplier)
         dense_results = self.vector_store.search(question, top_k=candidate_k, min_score=0.0)
         sparse_results = self.bm25_store.search(question, top_k=candidate_k)
-        return reciprocal_rank_fusion([dense_results, sparse_results])[:top_k]
+        return reciprocal_rank_fusion(
+            [dense_results, sparse_results],
+            k=self.rrf_k,
+            weights=[self.dense_weight, self.sparse_weight],
+            source_names=["dense", "sparse"],
+        )[:top_k]
 
     def answer(self, question: str, top_k: int = 5) -> RagOutput:
         safety = self.guardrails.check(question)

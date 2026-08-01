@@ -6,6 +6,10 @@ This project is not a diagnostic bot, not a prescribing tool, and not a replacem
 
 > Thông tin chỉ phục vụ học tập/tham khảo, không thay thế tư vấn của bác sĩ.
 
+For a Vietnamese interview-style explanation of the model architecture,
+chunking, hybrid retrieval, reranking, evaluation, and troubleshooting, see
+[`docs/RAG_INTERVIEW_VI.md`](docs/RAG_INTERVIEW_VI.md).
+
 ## Problem
 
 Medical learners often have scattered notes, PDFs, guidelines, slides, images, and lectures. MedTutor provides a clean backend and demo UI for asking questions against those materials while keeping the system inside a safe educational scope.
@@ -108,6 +112,81 @@ Before generation, every mode filters candidates against meaningful query
 terms. If no topic anchor remains, the service returns the insufficient-context
 message instead of sending unrelated nearest neighbors to the LLM.
 
+## Advanced RAG Pipeline
+
+The production-oriented retrieval path is:
+
+```text
+structured document
+  -> sentence-aware overlapping chunks
+  -> contextual indexing (title + section + chunk)
+  -> BGE-M3 dense retrieval + BM25 sparse retrieval
+  -> weighted reciprocal rank fusion
+  -> lexical or cross-encoder reranking
+  -> diversity selection
+  -> relevance guard
+  -> grounded generation with citations
+```
+
+Chunking preserves page and Markdown heading boundaries, prefers paragraph and
+sentence endings, aligns overlap to text boundaries, and avoids tiny tail
+chunks. Each chunk records `chunk_index`, `char_start`, and `char_end` in
+metadata. Defaults are configurable:
+
+```env
+CHUNK_SIZE=900
+CHUNK_OVERLAP=120
+CHUNK_MIN_SIZE=180
+```
+
+Dense and sparse candidate lists are fused with weighted RRF. Increase the
+dense weight for multilingual or paraphrased questions; increase the sparse
+weight for exact terminology, drug names, and laboratory markers:
+
+```env
+HYBRID_CANDIDATE_MULTIPLIER=4
+HYBRID_RRF_K=60
+HYBRID_DENSE_WEIGHT=1.0
+HYBRID_SPARSE_WEIGHT=1.0
+```
+
+The default reranker is deterministic and combines initial retrieval score,
+query-term coverage, title/section coverage, exact phrase evidence, and
+MMR-style diversity. For multilingual semantic reranking, enable the
+cross-encoder adapter:
+
+```env
+RERANKER_PROVIDER=cross-encoder
+RERANKER_MODEL=BAAI/bge-reranker-v2-m3
+RERANKER_CANDIDATE_K=20
+RERANKER_BATCH_SIZE=8
+RERANKER_DIVERSITY_LAMBDA=0.75
+```
+
+`GET /retrieve` includes a `signals` object for diagnostics. Depending on the
+mode and providers it contains dense/sparse ranks and scores, lexical coverage,
+title coverage, phrase match, reranker logit, and normalized semantic score.
+
+Changing `CHUNK_SIZE`, `CHUNK_OVERLAP`, or `CHUNK_MIN_SIZE` requires ingesting
+the source document again because chunk boundaries are persisted in SQLite.
+Re-ingest atomically replaces the previous chunks for the same document and
+removes stale vector entries.
+
+For local semantic retrieval without Docker, use the SQLite dense adapter:
+
+```env
+EMBEDDING_PROVIDER=sentence-transformers
+EMBEDDING_MODEL=BAAI/bge-m3
+EMBEDDING_DIMENSION=1024
+VECTOR_STORE_PROVIDER=sqlite-dense
+DENSE_INDEX_PATH=data/indexes/dense_vectors.db
+RERANKER_PROVIDER=lexical
+```
+
+`sqlite-dense` stores float32 vectors and chunk payloads in a local SQLite
+database. It is intended for development and small/medium corpora. Qdrant
+remains the recommended provider for concurrent or production deployments.
+
 ## Local Setup
 
 ```bash
@@ -158,8 +237,11 @@ Embedding: BAAI/bge-m3
 Dense store: Qdrant
 Sparse retrieval: BM25
 Fusion: Reciprocal Rank Fusion
-Generator: qwen3:4b through Ollama
+Generator: qwen3:4b-instruct-2507-q4_K_M through Ollama
 ```
+
+Qdrant is optional for local development. Replace it with
+`VECTOR_STORE_PROVIDER=sqlite-dense` when Docker is unavailable.
 
 ### 1. Start Ollama on Windows
 
@@ -172,7 +254,7 @@ ollama serve
 Open another PowerShell window:
 
 ```powershell
-ollama pull qwen3:4b
+ollama pull qwen3:4b-instruct-2507-q4_K_M
 ollama list
 ```
 
@@ -197,6 +279,23 @@ pip install -r requirements-rag.txt
 This installs the CPU-only PyTorch wheel. The first ingest or search downloads
 `BAAI/bge-m3` from Hugging Face.
 
+On Windows without Developer Mode, Hugging Face may fail to create cache
+symlinks with `WinError 1314`. Download directly into the project data
+directory instead:
+
+```powershell
+python -c "from huggingface_hub import snapshot_download; snapshot_download('BAAI/bge-m3', local_dir='data/models/bge-m3')"
+```
+
+Then configure:
+
+```env
+EMBEDDING_MODEL=data/models/bge-m3
+```
+
+`data/models` is ignored by Git and mounted through the existing Docker
+`data:/app/data` volume.
+
 ### 4. Enable real-model mode
 
 Copy `.env.example` to `.env`, then set:
@@ -204,8 +303,10 @@ Copy `.env.example` to `.env`, then set:
 ```env
 LLM_PROVIDER=ollama
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=qwen3:4b
+OLLAMA_MODEL=qwen3:4b-instruct-2507-q4_K_M
 OLLAMA_TIMEOUT_SECONDS=180
+OLLAMA_THINK=false
+OLLAMA_NUM_PREDICT=512
 
 EMBEDDING_PROVIDER=sentence-transformers
 EMBEDDING_MODEL=BAAI/bge-m3
@@ -216,7 +317,23 @@ EMBEDDING_BATCH_SIZE=8
 VECTOR_STORE_PROVIDER=qdrant
 QDRANT_URL=http://localhost:6333
 QDRANT_COLLECTION=medtutor_chunks
+
+RERANKER_PROVIDER=cross-encoder
+RERANKER_MODEL=BAAI/bge-reranker-v2-m3
+RERANKER_CANDIDATE_K=20
 ```
+
+Use `rag_mode=rerank` to apply the configured reranker. `rag_mode=hybrid`
+stops after weighted dense/BM25 fusion.
+
+For a lower-memory first run, keep `RERANKER_PROVIDER=lexical`. This loads only
+BGE-M3 for dense retrieval. Enable the cross-encoder after validating dense
+retrieval quality and available memory.
+
+Keep `OLLAMA_THINK=false` for normal grounded RAG on CPU. Set it to `true` only
+when the extra reasoning latency is acceptable; long contexts can otherwise
+exceed `OLLAMA_TIMEOUT_SECONDS`. `OLLAMA_NUM_PREDICT` bounds answer length and
+keeps local CPU generation latency predictable.
 
 Start FastAPI with the environment file:
 
@@ -245,14 +362,22 @@ python -m scripts.ingest_sample_data
 Use `hybrid` mode in the chat interface. The request path is:
 
 ```text
-query -> BGE-M3/Qdrant + BM25 -> RRF -> qwen3:4b -> cited answer
+query -> BGE-M3/Qdrant + BM25 -> RRF
+      -> qwen3:4b-instruct-2507-q4_K_M -> cited answer
 ```
 
 If chunks already exist in SQLite but Qdrant is new or was reset, rebuild the
 dense index without re-ingesting source files:
 
 ```bash
-python -m scripts.reindex_vectors --clear
+python -m scripts.reindex_vectors --clear --batch-size 32
+```
+
+The command commits every batch. If it is interrupted, continue without
+re-encoding completed chunks:
+
+```bash
+python -m scripts.reindex_vectors --resume --batch-size 32
 ```
 
 ## Docker
@@ -277,8 +402,9 @@ The primary Next.js frontend is run separately from `web/` and is available at
 `http://localhost:3000`.
 
 Mock/lexical mode remains the default. Set `INSTALL_RAG=true`,
-`EMBEDDING_PROVIDER=sentence-transformers`, and
-`VECTOR_STORE_PROVIDER=qdrant` to enable the dense path in Docker.
+`EMBEDDING_PROVIDER=sentence-transformers`, and either
+`VECTOR_STORE_PROVIDER=sqlite-dense` or `VECTOR_STORE_PROVIDER=qdrant` to
+enable the dense path in Docker.
 
 ## Ingest Sample Data
 
@@ -427,6 +553,7 @@ Metrics included:
 - `hit_at_k`
 - `mrr`
 - `citation_rate`
+- `format_compliance_rate`
 - `disclaimer_rate`
 - `insufficient_context_accuracy`
 - `safety_accuracy`
@@ -434,8 +561,15 @@ Metrics included:
 `POST /eval/run` also returns per-question details for retrieval rank, citation,
 insufficient-context behavior, disclaimer presence, and the actual safety
 warning. The Next.js Evaluation page displays these checks as an audit table.
-`citation_rate` is measured only on answerable cases; safety-blocked and
-insufficient-context cases are expected to have no citations.
+`citation_rate` requires both a retrieved source and an actual `[n]` citation
+in the answer. `format_compliance_rate` requires either all four configured
+headings or four numbered answer blocks. Both are measured only on answerable
+cases; safety-blocked and insufficient-context cases are expected to have no
+citations.
+
+Latest local smoke snapshot (2026-07-31, six cases, not a clinical
+benchmark): Hit@5 `1.000`, MRR `0.833`, and `1.000` for citation, answer
+format, disclaimer, insufficient-context handling, and safety.
 
 ## Tests
 
@@ -445,10 +579,12 @@ python -m pytest tests -q
 
 Minimum tests cover:
 
-- Chunking and required metadata.
+- Sentence-aware chunking, overlap, tail handling, and required metadata.
 - Emergency detection.
 - Diagnosis/prescription guardrails.
-- Local vector retrieval, Okapi BM25, and Reciprocal Rank Fusion.
+- Local vector retrieval, Okapi BM25, and weighted Reciprocal Rank Fusion.
+- Multi-signal lexical reranking, diversity selection, and cross-encoder adapter.
+- Cross-language semantic relevance signals.
 - WAV validation, STT provider selection, voice chat, and searchable lecture ingestion.
 - Chat API answer and sources.
 - Empty-context answer.
@@ -494,10 +630,9 @@ Minimum tests cover:
 
 1. Build a labeled retrieval evaluation set for the collected corpus.
 2. Measure BGE-M3 + BM25 hybrid retrieval against the lexical baseline.
-3. Add reranking through a cross-encoder provider only if evaluation justifies it.
+3. Tune dense/sparse weights and reranker thresholds on the labeled corpus.
 4. Replace mock OCR/caption defaults with tested local or hosted providers.
 5. Add keyframe extraction for video when transcript-only evaluation shows a gap.
-6. Add a cross-encoder reranker adapter and compare it with the lexical baseline.
 7. Add APScheduler or cron deployment around the existing manual URL updater.
 8. Add answer-faithfulness and citation-entailment evaluation.
 9. Add authentication before exposing uploads outside a local/private environment.

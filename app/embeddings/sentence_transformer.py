@@ -42,8 +42,7 @@ class SentenceTransformerEmbedding(EmbeddingProvider):
             from sentence_transformers import SentenceTransformer
         except ImportError as exc:
             raise RuntimeError(
-                "Dense embedding cần sentence-transformers. "
-                "Cài bằng: pip install -r requirements-rag.txt"
+                "Dense embedding cần sentence-transformers. " "Cài bằng: pip install -r requirements-rag.txt"
             ) from exc
         self._model = SentenceTransformer(self.model_name, device=self.device)
         return self._model

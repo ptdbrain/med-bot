@@ -23,10 +23,7 @@ class MockOCR:
     name = "mock"
 
     def extract_text(self, filename: str, content: bytes) -> str:
-        return (
-            f"Mock OCR cho {filename}. "
-            "Hãy cấu hình pytesseract hoặc easyocr để trích xuất text thật."
-        )
+        return f"Mock OCR cho {filename}. " "Hãy cấu hình pytesseract hoặc easyocr để trích xuất text thật."
 
 
 class MockImageCaptioner:

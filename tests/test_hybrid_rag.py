@@ -70,6 +70,45 @@ class HybridRagTest(unittest.TestCase):
         self.assertEqual({result.chunk.chunk_id for result in results}, {"stroke-0", "lab-0"})
         self.assertTrue(all(0 < result.score < 1 for result in results))
 
+    def test_weighted_rrf_can_prioritize_dense_semantic_ranking(self) -> None:
+        semantic = _chunk("semantic-0", "Enzyme catalysis", "biochemistry")
+        lexical = _chunk("lexical-0", "Metabolism glossary", "glossary")
+
+        results = reciprocal_rank_fusion(
+            [
+                [
+                    SearchResult(semantic, 0.82, {"semantic_score": 0.82}),
+                    SearchResult(lexical, 0.70, {"semantic_score": 0.70}),
+                ],
+                [
+                    SearchResult(lexical, 8.0),
+                    SearchResult(semantic, 2.0),
+                ],
+            ],
+            k=10,
+            weights=[2.0, 1.0],
+            source_names=["dense", "sparse"],
+        )
+
+        self.assertEqual(results[0].chunk.chunk_id, "semantic-0")
+        self.assertEqual(results[0].signals["dense_rank"], 1.0)
+        self.assertEqual(results[0].signals["sparse_rank"], 2.0)
+        self.assertEqual(results[0].signals["semantic_score"], 0.82)
+
+    def test_rrf_equal_scores_preserve_configured_source_priority(self) -> None:
+        dense = _chunk("z-dense", "Semantic result", "dense")
+        sparse = _chunk("a-sparse", "Keyword result", "sparse")
+
+        results = reciprocal_rank_fusion(
+            [
+                [SearchResult(dense, 0.75)],
+                [SearchResult(sparse, 8.0)],
+            ],
+            source_names=["dense", "sparse"],
+        )
+
+        self.assertEqual(results[0].chunk.chunk_id, "z-dense")
+
     def test_service_hybrid_mode_returns_grounded_sources(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -82,9 +121,8 @@ class HybridRagTest(unittest.TestCase):
             service.ingest_file(
                 "blood_tests.md",
                 (
-                    "# Hemoglobin\n\n"
-                    "Hemoglobin phản ánh khả năng vận chuyển oxy của hồng cầu trong xét nghiệm máu."
-                ).encode("utf-8"),
+                    "# Hemoglobin\n\n" "Hemoglobin phản ánh khả năng vận chuyển oxy của hồng cầu trong xét nghiệm máu."
+                ).encode(),
             )
 
             result = service.chat("Hemoglobin có vai trò gì?", rag_mode="hybrid", top_k=3)

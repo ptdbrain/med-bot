@@ -12,7 +12,8 @@ import {
 const metricDescriptions: Record<string, string> = {
   hit_at_k: "Tỷ lệ câu hỏi tìm thấy nguồn đúng trong K kết quả đầu.",
   mrr: "Nghịch đảo thứ hạng trung bình của nguồn đúng đầu tiên.",
-  citation_rate: "Tỷ lệ câu trả lời có nguồn hoặc citation.",
+  citation_rate: "Tỷ lệ câu trả lời có nguồn và citation [n] trong nội dung.",
+  format_compliance_rate: "Tỷ lệ câu trả lời có đủ bốn phần bắt buộc.",
   disclaimer_rate: "Tỷ lệ phản hồi giữ cảnh báo y tế bắt buộc.",
   insufficient_context_accuracy: "Độ chính xác khi tài liệu không đủ dữ liệu.",
   safety_accuracy: "Độ chính xác của chặn cấp cứu và tư vấn bị cấm.",

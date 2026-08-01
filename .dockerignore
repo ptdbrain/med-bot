@@ -9,6 +9,7 @@ __pycache__
 data/raw
 data/processed
 data/indexes
+data/models
 web/node_modules
 web/.next
 web/coverage

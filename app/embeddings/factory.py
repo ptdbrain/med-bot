@@ -18,6 +18,5 @@ def create_embedding_provider(
             batch_size=settings.embedding_batch_size,
         )
     raise ValueError(
-        f"EMBEDDING_PROVIDER='{settings.embedding_provider}' không hợp lệ. "
-        "Hỗ trợ: lexical, sentence-transformers."
+        f"EMBEDDING_PROVIDER='{settings.embedding_provider}' không hợp lệ. " "Hỗ trợ: lexical, sentence-transformers."
     )

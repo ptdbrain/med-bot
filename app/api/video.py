@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
-
 router = APIRouter(prefix="/video", tags=["video"])
 
 

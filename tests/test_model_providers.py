@@ -64,6 +64,8 @@ class ModelProviderTests(unittest.TestCase):
                 "OLLAMA_BASE_URL": "http://host.test:11434/",
                 "OLLAMA_MODEL": "qwen3:4b",
                 "OLLAMA_TIMEOUT_SECONDS": "45",
+                "OLLAMA_THINK": "true",
+                "OLLAMA_NUM_PREDICT": "128",
                 "EMBEDDING_PROVIDER": "sentence-transformers",
                 "EMBEDDING_MODEL": "BAAI/bge-m3",
                 "EMBEDDING_DEVICE": "cpu",
@@ -80,6 +82,8 @@ class ModelProviderTests(unittest.TestCase):
         self.assertEqual(settings.ollama_base_url, "http://host.test:11434")
         self.assertEqual(settings.ollama_model, "qwen3:4b")
         self.assertEqual(settings.ollama_timeout_seconds, 45)
+        self.assertTrue(settings.ollama_think)
+        self.assertEqual(settings.ollama_num_predict, 128)
         self.assertEqual(settings.embedding_provider, "sentence-transformers")
         self.assertEqual(settings.embedding_model, "BAAI/bge-m3")
         self.assertEqual(settings.embedding_dimension, 1024)
@@ -102,6 +106,8 @@ class ModelProviderTests(unittest.TestCase):
             base_url="http://localhost:11434/",
             model="qwen3:4b",
             timeout_seconds=30,
+            think=False,
+            num_predict=128,
             session=session,
         )
 
@@ -114,9 +120,10 @@ class ModelProviderTests(unittest.TestCase):
         self.assertEqual(payload["model"], "qwen3:4b")
         self.assertFalse(payload["stream"])
         self.assertTrue(payload["think"])
+        self.assertEqual(payload["options"]["num_predict"], 128)
         self.assertIn("[1]", payload["messages"][1]["content"])
         self.assertIn("Hướng dẫn đột quỵ", payload["messages"][1]["content"])
-        self.assertNotIn("/no_think", payload["messages"][1]["content"])
+        self.assertTrue(payload["messages"][1]["content"].endswith("\n/no_think"))
         self.assertIn("không đủ thông tin", payload["messages"][0]["content"])
         for section in (
             "1. Câu trả lời ngắn gọn",
@@ -145,11 +152,81 @@ class ModelProviderTests(unittest.TestCase):
                 llm_provider="ollama",
                 ollama_base_url="http://ollama.test:11434",
                 ollama_model="qwen3:4b",
+                ollama_think=True,
+                ollama_num_predict=96,
             )
         )
 
         self.assertIsInstance(provider, OllamaLLM)
         self.assertEqual(provider.base_url, "http://ollama.test:11434")
+        self.assertTrue(provider.think)
+        self.assertEqual(provider.num_predict, 96)
+
+    def test_ollama_thinking_mode_does_not_add_no_think_directive(self) -> None:
+        session = FakeSession(
+            FakeResponse(
+                {
+                    "message": {
+                        "content": "FAST gồm bốn dấu hiệu chính [1].",
+                    }
+                }
+            )
+        )
+        provider = OllamaLLM(
+            base_url="http://localhost:11434",
+            think=True,
+            session=session,
+        )
+
+        provider.generate("FAST gồm gì?", [_context()])
+
+        payload = session.calls[0]["json"]
+        self.assertTrue(payload["think"])
+        self.assertNotIn("/no_think", payload["messages"][1]["content"])
+
+    def test_non_reasoning_model_keeps_thinking_parser_disabled(self) -> None:
+        session = FakeSession(
+            FakeResponse(
+                {
+                    "message": {
+                        "content": "Grounded answer [1].",
+                    }
+                }
+            )
+        )
+        provider = OllamaLLM(
+            base_url="http://localhost:11434",
+            model="llama3.2:3b",
+            think=False,
+            session=session,
+        )
+
+        provider.generate("Question?", [_context()])
+
+        self.assertFalse(session.calls[0]["json"]["think"])
+
+    def test_qwen_instruct_model_does_not_enable_hybrid_thinking(self) -> None:
+        session = FakeSession(
+            FakeResponse(
+                {
+                    "message": {
+                        "content": "Grounded answer [1].",
+                    }
+                }
+            )
+        )
+        provider = OllamaLLM(
+            base_url="http://localhost:11434",
+            model="qwen3:4b-instruct-2507-q4_K_M",
+            think=False,
+            session=session,
+        )
+
+        provider.generate("Question?", [_context()])
+
+        payload = session.calls[0]["json"]
+        self.assertFalse(payload["think"])
+        self.assertNotIn("/no_think", payload["messages"][1]["content"])
 
     def test_llm_factory_rejects_unknown_provider(self) -> None:
         with self.assertRaisesRegex(ValueError, "LLM_PROVIDER"):

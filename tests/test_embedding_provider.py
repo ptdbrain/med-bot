@@ -45,9 +45,7 @@ class EmbeddingProviderTests(unittest.TestCase):
         self.assertEqual(vector, [1.0, 0.5])
 
     def test_lexical_provider_does_not_construct_dense_model(self) -> None:
-        provider = create_embedding_provider(
-            Settings(embedding_provider="lexical")
-        )
+        provider = create_embedding_provider(Settings(embedding_provider="lexical"))
 
         self.assertIsNone(provider)
 
@@ -69,9 +67,7 @@ class EmbeddingProviderTests(unittest.TestCase):
 
     def test_factory_rejects_unknown_embedding_provider(self) -> None:
         with self.assertRaisesRegex(ValueError, "EMBEDDING_PROVIDER"):
-            create_embedding_provider(
-                Settings(embedding_provider="unknown")
-            )
+            create_embedding_provider(Settings(embedding_provider="unknown"))
 
 
 if __name__ == "__main__":

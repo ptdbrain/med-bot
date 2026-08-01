@@ -8,6 +8,7 @@ class RetrievedChunk(BaseModel):
     text: str
     score: float
     metadata: dict
+    signals: dict[str, float] = Field(default_factory=dict)
 
 
 class RetrievalResponse(BaseModel):

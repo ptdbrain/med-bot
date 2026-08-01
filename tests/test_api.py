@@ -67,3 +67,17 @@ def test_retrieve_api_rejects_unknown_rag_mode(tmp_path):
 
     assert response.status_code == 400
     assert "RAG mode" in response.json()["detail"]
+
+
+def test_health_reports_active_rag_providers_and_vector_count(tmp_path):
+    client = TestClient(create_app(_test_settings(tmp_path)))
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["chunks_indexed"] == 0
+    assert payload["vectors_indexed"] == 0
+    assert payload["embedding_provider"] == "lexical"
+    assert payload["vector_store_provider"] == "memory"
+    assert payload["reranker_provider"] == "lexical"

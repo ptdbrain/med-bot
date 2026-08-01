@@ -53,9 +53,7 @@ def evaluate_retrieval_with_details(
                 "mode": mode,
                 "expected_source": expected,
                 "rank": rank or None,
-                "retrieved_sources": [
-                    result.chunk.metadata.source_path for result in results
-                ],
+                "retrieved_sources": [result.chunk.metadata.source_path for result in results],
                 "passed": rank > 0,
             }
         )

@@ -4,7 +4,7 @@ from app.llm.base import LLMProvider
 from app.llm.mock_llm import INSUFFICIENT_CONTEXT_MESSAGE
 from app.rag.naive_rag import RagOutput
 from app.retrieval.relevance import filter_relevant_results
-from app.retrieval.reranker import LexicalReranker
+from app.retrieval.reranker import Reranker
 from app.safety.medical_guardrails import MedicalGuardrails
 from app.schemas.document import SearchResult
 
@@ -13,7 +13,7 @@ class RerankRAG:
     def __init__(
         self,
         retriever,
-        reranker: LexicalReranker,
+        reranker: Reranker,
         llm: LLMProvider,
         guardrails: MedicalGuardrails,
         candidate_k: int = 20,
@@ -48,8 +48,6 @@ class RerankRAG:
                 results=[],
             )
         return RagOutput(
-            answer=self.guardrails.with_disclaimer(
-                self.llm.generate(question, results)
-            ),
+            answer=self.guardrails.with_disclaimer(self.llm.generate(question, results)),
             results=results,
         )

@@ -50,6 +50,9 @@ class FakeVectorStore:
     def add_chunks(self, chunks: list[Chunk]) -> None:
         self.added.extend(chunks)
 
+    def existing_chunk_ids(self) -> set[str]:
+        return {"already-indexed"}
+
 
 class RealModelServiceTests(unittest.TestCase):
     def test_metadata_store_lists_persisted_chunks(self) -> None:
@@ -126,6 +129,33 @@ class RealModelServiceTests(unittest.TestCase):
         self.assertEqual(count, 1)
         self.assertEqual(vector_store.clear_calls, 1)
         self.assertEqual(vector_store.added[0].chunk_id, "persisted-1")
+
+    def test_reindex_chunks_batches_and_resumes_existing_index(self) -> None:
+        vector_store = FakeVectorStore()
+        chunks = [
+            Chunk(
+                chunk_id=chunk_id,
+                text=f"Chunk {chunk_id}",
+                metadata=_chunk().metadata,
+            )
+            for chunk_id in ("already-indexed", "new-1", "new-2")
+        ]
+        progress: list[tuple[int, int]] = []
+
+        count = reindex_chunks(
+            chunks,
+            vector_store,
+            batch_size=1,
+            resume=True,
+            progress_callback=lambda done, total: progress.append((done, total)),
+        )
+
+        self.assertEqual(count, 2)
+        self.assertEqual(
+            [chunk.chunk_id for chunk in vector_store.added],
+            ["new-1", "new-2"],
+        )
+        self.assertEqual(progress, [(1, 2), (2, 2)])
 
 
 if __name__ == "__main__":

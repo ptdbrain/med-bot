@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from app.schemas.document import Chunk, ChunkMetadata, Document, SearchResult
@@ -15,13 +17,18 @@ class SQLiteMetadataStore:
         ensure_directory(db_path.parent)
         self._init_db()
 
-    def _connect(self) -> sqlite3.Connection:
-        return sqlite3.connect(self.db_path)
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        connection = sqlite3.connect(self.db_path)
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
 
     def _init_db(self) -> None:
         with self._connect() as connection:
-            connection.execute(
-                """
+            connection.execute("""
                 CREATE TABLE IF NOT EXISTS documents (
                     doc_id TEXT PRIMARY KEY,
                     title TEXT NOT NULL,
@@ -29,20 +36,16 @@ class SQLiteMetadataStore:
                     source_type TEXT NOT NULL,
                     metadata_json TEXT NOT NULL
                 )
-                """
-            )
-            connection.execute(
-                """
+                """)
+            connection.execute("""
                 CREATE TABLE IF NOT EXISTS chunks (
                     chunk_id TEXT PRIMARY KEY,
                     doc_id TEXT NOT NULL,
                     text TEXT NOT NULL,
                     metadata_json TEXT NOT NULL
                 )
-                """
-            )
-            connection.execute(
-                """
+                """)
+            connection.execute("""
                 CREATE TABLE IF NOT EXISTS parent_sections (
                     parent_id TEXT PRIMARY KEY,
                     doc_id TEXT NOT NULL,
@@ -52,18 +55,15 @@ class SQLiteMetadataStore:
                     text TEXT NOT NULL,
                     metadata_json TEXT NOT NULL
                 )
-                """
-            )
-            connection.execute(
-                """
+                """)
+            connection.execute("""
                 CREATE TABLE IF NOT EXISTS url_sources (
                     url TEXT PRIMARY KEY,
                     content_hash TEXT NOT NULL,
                     doc_id TEXT NOT NULL,
                     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
-                """
-            )
+                """)
 
     def upsert_document(self, document: Document) -> None:
         with self._connect() as connection:
@@ -100,12 +100,8 @@ class SQLiteMetadataStore:
             )
 
     def upsert_parent_sections(self, chunks: list[Chunk]) -> None:
-        grouped: dict[str, list[Chunk]] = {}
-        for chunk in chunks:
-            parent_id = chunk.metadata.parent_id
-            if parent_id:
-                grouped.setdefault(parent_id, []).append(chunk)
-        if not grouped:
+        rows = self._parent_section_rows(chunks)
+        if not rows:
             return
         with self._connect() as connection:
             connection.executemany(
@@ -121,22 +117,98 @@ class SQLiteMetadataStore:
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
+                rows,
+            )
+
+    def replace_document_chunks(
+        self,
+        document: Document,
+        chunks: list[Chunk],
+    ) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO documents(
+                    doc_id,
+                    title,
+                    source_path,
+                    source_type,
+                    metadata_json
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    document.doc_id,
+                    document.title,
+                    document.source_path,
+                    document.source_type,
+                    json.dumps(document.metadata, ensure_ascii=False),
+                ),
+            )
+            connection.execute(
+                "DELETE FROM parent_sections WHERE doc_id = ?",
+                (document.doc_id,),
+            )
+            connection.execute(
+                "DELETE FROM chunks WHERE doc_id = ?",
+                (document.doc_id,),
+            )
+            connection.executemany(
+                """
+                INSERT INTO chunks(chunk_id, doc_id, text, metadata_json)
+                VALUES (?, ?, ?, ?)
+                """,
                 [
                     (
-                        parent_id,
-                        section_chunks[0].metadata.doc_id,
-                        section_chunks[0].metadata.title,
-                        section_chunks[0].metadata.section_title,
-                        section_chunks[0].metadata.page_number,
-                        "\n\n".join(chunk.text for chunk in section_chunks),
+                        chunk.chunk_id,
+                        chunk.metadata.doc_id,
+                        chunk.text,
                         json.dumps(
-                            section_chunks[0].metadata.to_dict(),
+                            chunk.metadata.to_dict(),
                             ensure_ascii=False,
                         ),
                     )
-                    for parent_id, section_chunks in grouped.items()
+                    for chunk in chunks
                 ],
             )
+            connection.executemany(
+                """
+                INSERT INTO parent_sections(
+                    parent_id,
+                    doc_id,
+                    title,
+                    section_title,
+                    page_number,
+                    text,
+                    metadata_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                self._parent_section_rows(chunks),
+            )
+
+    @staticmethod
+    def _parent_section_rows(chunks: list[Chunk]) -> list[tuple]:
+        grouped: dict[str, list[Chunk]] = {}
+        for chunk in chunks:
+            parent_id = chunk.metadata.parent_id
+            if parent_id:
+                grouped.setdefault(parent_id, []).append(chunk)
+        return [
+            (
+                parent_id,
+                section_chunks[0].metadata.doc_id,
+                section_chunks[0].metadata.title,
+                section_chunks[0].metadata.section_title,
+                section_chunks[0].metadata.page_number,
+                "\n\n".join(chunk.text for chunk in section_chunks),
+                json.dumps(
+                    section_chunks[0].metadata.to_dict(),
+                    ensure_ascii=False,
+                ),
+            )
+            for parent_id, section_chunks in grouped.items()
+        ]
 
     def count_chunks(self) -> int:
         with self._connect() as connection:
@@ -145,13 +217,11 @@ class SQLiteMetadataStore:
 
     def list_chunks(self) -> list[Chunk]:
         with self._connect() as connection:
-            rows = connection.execute(
-                """
+            rows = connection.execute("""
                 SELECT chunk_id, text, metadata_json
                 FROM chunks
                 ORDER BY rowid
-                """
-            ).fetchall()
+                """).fetchall()
         return [
             Chunk(
                 chunk_id=str(row[0]),
@@ -163,8 +233,7 @@ class SQLiteMetadataStore:
 
     def list_parent_sections(self) -> list[dict]:
         with self._connect() as connection:
-            rows = connection.execute(
-                """
+            rows = connection.execute("""
                 SELECT
                     parent_id,
                     doc_id,
@@ -175,8 +244,7 @@ class SQLiteMetadataStore:
                     metadata_json
                 FROM parent_sections
                 ORDER BY rowid
-                """
-            ).fetchall()
+                """).fetchall()
         return [
             {
                 "parent_id": str(row[0]),
@@ -192,8 +260,7 @@ class SQLiteMetadataStore:
 
     def list_documents(self) -> list[dict]:
         with self._connect() as connection:
-            rows = connection.execute(
-                """
+            rows = connection.execute("""
                 SELECT
                     documents.doc_id,
                     documents.title,
@@ -205,8 +272,7 @@ class SQLiteMetadataStore:
                 LEFT JOIN chunks ON chunks.doc_id = documents.doc_id
                 GROUP BY documents.doc_id
                 ORDER BY documents.rowid DESC
-                """
-            ).fetchall()
+                """).fetchall()
         return [
             {
                 "doc_id": str(row[0]),
@@ -221,11 +287,7 @@ class SQLiteMetadataStore:
 
     def get_document(self, doc_id: str) -> dict | None:
         return next(
-            (
-                document
-                for document in self.list_documents()
-                if document["doc_id"] == doc_id
-            ),
+            (document for document in self.list_documents() if document["doc_id"] == doc_id),
             None,
         )
 
@@ -312,9 +374,7 @@ class SQLiteMetadataStore:
         for child_result in child_results:
             child = child_result.chunk
             metadata = child.metadata
-            parent_key = metadata.parent_id or (
-                f"{metadata.doc_id}:{metadata.section_title or '__document__'}"
-            )
+            parent_key = metadata.parent_id or (f"{metadata.doc_id}:{metadata.section_title or '__document__'}")
             if parent_key in seen:
                 continue
             seen.add(parent_key)
@@ -345,9 +405,7 @@ class SQLiteMetadataStore:
                     text="\n\n".join(chunk.text for chunk in siblings),
                     metadata=parent_metadata,
                 )
-            expanded.append(
-                SearchResult(chunk=parent_chunk, score=child_result.score)
-            )
+            expanded.append(SearchResult(chunk=parent_chunk, score=child_result.score))
             if len(expanded) >= top_k:
                 break
         return expanded

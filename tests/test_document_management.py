@@ -28,24 +28,14 @@ class DocumentManagementTests(unittest.TestCase):
             title="Đột quỵ",
             source_path="stroke.md",
             source_type="md",
-            text=(
-                "# FAST\n\n"
-                + ("Face Arm Speech Time. " * 20)
-                + "\n\n## Phòng ngừa\n\nKiểm soát yếu tố nguy cơ."
-            ),
+            text=("# FAST\n\n" + ("Face Arm Speech Time. " * 20) + "\n\n## Phòng ngừa\n\nKiểm soát yếu tố nguy cơ."),
         )
 
         chunks = TextChunker(chunk_size=100, chunk_overlap=10).chunk(document)
 
-        fast_parent_ids = {
-            chunk.metadata.parent_id
-            for chunk in chunks
-            if chunk.metadata.section_title == "FAST"
-        }
+        fast_parent_ids = {chunk.metadata.parent_id for chunk in chunks if chunk.metadata.section_title == "FAST"}
         prevention_parent_ids = {
-            chunk.metadata.parent_id
-            for chunk in chunks
-            if chunk.metadata.section_title == "Phòng ngừa"
+            chunk.metadata.parent_id for chunk in chunks if chunk.metadata.section_title == "Phòng ngừa"
         }
         self.assertEqual(len(fast_parent_ids), 1)
         self.assertNotIn(None, fast_parent_ids)
@@ -56,10 +46,7 @@ class DocumentManagementTests(unittest.TestCase):
             service = RAGService(_settings(Path(tmp)))
             service.ingest_file(
                 "stroke.md",
-                (
-                    "# FAST\n\n"
-                    + ("Face Arm Speech Time là dấu hiệu đột quỵ. " * 25)
-                ).encode("utf-8"),
+                ("# FAST\n\n" + ("Face Arm Speech Time là dấu hiệu đột quỵ. " * 25)).encode("utf-8"),
             )
 
             parents = service.metadata_store.list_parent_sections()
@@ -72,6 +59,35 @@ class DocumentManagementTests(unittest.TestCase):
         self.assertEqual(len(parents), 1)
         self.assertEqual(parents[0]["section_title"], "FAST")
         self.assertGreater(len(expanded[0].chunk.text), len(child_results[0].chunk.text))
+
+    def test_reingest_replaces_chunks_when_chunking_strategy_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            service = RAGService(_settings(Path(tmp)))
+            content = ("# Enzymes\n\n" + ("Enzyme activity depends on substrate concentration. " * 20)).encode("utf-8")
+
+            service.pipeline.chunker = TextChunker(
+                chunk_size=120,
+                chunk_overlap=20,
+                min_chunk_size=30,
+            )
+            first = service.ingest_file("enzymes.md", content)
+            first_ids = set(service.metadata_store.chunk_ids_for_document(first.doc_id))
+
+            service.pipeline.chunker = TextChunker(
+                chunk_size=300,
+                chunk_overlap=40,
+                min_chunk_size=60,
+            )
+            second = service.ingest_file("enzymes.md", content)
+            second_ids = set(service.metadata_store.chunk_ids_for_document(second.doc_id))
+            vector_ids = {
+                chunk.chunk_id for chunk in service.vector_store.chunks if chunk.metadata.doc_id == second.doc_id
+            }
+
+        self.assertEqual(first.doc_id, second.doc_id)
+        self.assertGreater(len(first_ids), len(second_ids))
+        self.assertEqual(second_ids, vector_ids)
+        self.assertTrue(first_ids - second_ids)
 
     def test_documents_api_lists_ingested_documents_with_chunk_counts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

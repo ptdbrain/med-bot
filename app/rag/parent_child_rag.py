@@ -44,8 +44,6 @@ class ParentChildRAG:
                 results=[],
             )
         return RagOutput(
-            answer=self.guardrails.with_disclaimer(
-                self.llm.generate(question, results)
-            ),
+            answer=self.guardrails.with_disclaimer(self.llm.generate(question, results)),
             results=results,
         )

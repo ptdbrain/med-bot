@@ -91,7 +91,7 @@ class AudioProcessingTest(unittest.TestCase):
             )
             service.ingest_file(
                 "stroke.md",
-                "# FAST\n\nFAST gồm méo miệng, yếu tay, nói khó và cần gọi cấp cứu sớm.".encode("utf-8"),
+                "# FAST\n\nFAST gồm méo miệng, yếu tay, nói khó và cần gọi cấp cứu sớm.".encode(),
             )
 
             transcription, chat = service.voice_chat(
