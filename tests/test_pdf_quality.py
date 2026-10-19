@@ -7,9 +7,11 @@ class FakeOCR:
 
     def __init__(self):
         self.calls = 0
+        self.context = None
 
-    def recognize(self, image, *, page_number, languages):
+    def recognize(self, image, *, page_number, languages, **context):
         self.calls += 1
+        self.context = context
         return OCRResult(
             (
                 TextBlock(
@@ -48,6 +50,46 @@ def test_scan_uses_ocr_but_blank_does_not():
     assert page.blocks[0].confidence == 0.95
     assert blank.status == "blank"
     assert ocr.calls == 1
+
+
+def test_scan_propagates_job_correlation_to_provider_and_page_report():
+    ocr = FakeOCR()
+    loader = PdfLoader(ocr=ocr, renderer=FakeRenderer(), correlation_id="trace-7", job_id="job-7")
+    page = loader.extract_page(b"pdf", 1, "", 0.9, True)
+    assert ocr.context == {"correlation_id": "trace-7", "job_id": "job-7", "dpi": 250}
+    assert page.diagnostics["correlation_id"] == "trace-7"
+    assert page.diagnostics["job_id"] == "job-7"
+
+
+def test_pdf_failure_keeps_job_trace_and_page_diagnostics(tmp_path):
+    import io
+
+    import pytest
+    from reportlab.pdfgen import canvas
+
+    from app.ingestion.pdf_loader import PDFExtractionError
+
+    data = io.BytesIO()
+    pdf = canvas.Canvas(data)
+    pdf.showPage()
+    pdf.save()
+
+    class ScanRenderer(FakeRenderer):
+        def inspect_page(self, content, page_number):
+            return [], 0.9, True
+
+    class EmptyOCR(FakeOCR):
+        def recognize(self, image, *, page_number, languages, **context):
+            self.context = context
+            return OCRResult((), None, (), {"failure_category": "test_empty", "page_number": page_number})
+
+    ocr = EmptyOCR()
+    loader = PdfLoader(ocr=ocr, renderer=ScanRenderer(), correlation_id="trace-pdf", job_id="job-pdf")
+    with pytest.raises(PDFExtractionError) as caught:
+        loader.load(tmp_path / "scan.pdf", data.getvalue())
+    assert caught.value.report["correlation_id"] == "trace-pdf"
+    assert caught.value.report["job_id"] == "job-pdf"
+    assert caught.value.report["pages"][0]["diagnostics"]["failure_category"] == "test_empty"
 
 
 def test_mixed_page_with_good_native_text_still_reads_large_image():

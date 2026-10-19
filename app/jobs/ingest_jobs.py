@@ -141,14 +141,23 @@ class IngestJobQueue:
                 replace_doc_id=job["replace_doc_id"],
                 allow_partial=bool(job["allow_partial"]),
                 progress=progress,
+                correlation_id=job["job_id"],
+                job_id=job["job_id"],
             )
             self.update(job["job_id"], owner, "completed", report=asdict(result))
         except InterruptedError:
             self.update(job["job_id"], owner, "cancelled")
         except Exception as exc:  # noqa: BLE001 - Persist all worker failures for inspection and retry.
-            review = getattr(exc, "report", None)
+            report = getattr(exc, "report", None)
+            from app.ingestion.pipeline import IngestReviewRequired
+
+            needs_review = isinstance(exc, IngestReviewRequired)
             self.update(
-                job["job_id"], owner, "needs_review" if review else "failed", report=review, error=type(exc).__name__
+                job["job_id"],
+                owner,
+                "needs_review" if needs_review else "failed",
+                report=report,
+                error=str(exc)[:500],
             )
         finally:
             stopped.set()

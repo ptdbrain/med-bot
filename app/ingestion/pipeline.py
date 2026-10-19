@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -76,6 +77,8 @@ class IngestionPipeline:
         replace_doc_id: str | None = None,
         allow_partial: bool = False,
         progress=None,
+        correlation_id: str | None = None,
+        job_id: str | None = None,
     ) -> IngestResult:
         validate_size(content, self.settings.max_upload_bytes)
         extension = validate_extension(filename, ALLOWED_DOCUMENT_EXTENSIONS)
@@ -85,7 +88,8 @@ class IngestionPipeline:
         if replace_doc_id and self.metadata_store.get_document(replace_doc_id) is None:
             raise ValueError("Replacement document does not exist")
         path = self.settings.data_dir / "raw" / doc_id / digest / safe_name
-        document = self._load_document(path, content, extension)
+        correlation_id = correlation_id or str(uuid.uuid4())
+        document = self._load_document(path, content, extension, correlation_id=correlation_id, job_id=job_id)
         document.doc_id = doc_id
         document.title = Path(safe_name).stem.replace("_", " ")
         document.metadata["content_hash"] = digest
@@ -129,7 +133,15 @@ class IngestionPipeline:
         path.write_bytes(content)
         return path
 
-    def _load_document(self, path: Path, content: bytes, extension: str) -> Document:
+    def _load_document(
+        self,
+        path: Path,
+        content: bytes,
+        extension: str,
+        *,
+        correlation_id: str | None = None,
+        job_id: str | None = None,
+    ) -> Document:
         if extension in {".txt", ".md"}:
             return TextLoader().load(path, content)
         if extension in {".html", ".htm"}:
@@ -141,6 +153,8 @@ class IngestionPipeline:
                 dpi=self.settings.ocr_dpi,
                 max_pages=self.settings.pdf_max_pages,
                 languages=self.settings.ocr_languages,
+                correlation_id=correlation_id,
+                job_id=job_id,
             ).load(path, content)
         if extension == ".docx":
             return DocxLoader().load(path, content)

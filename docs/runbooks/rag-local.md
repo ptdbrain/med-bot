@@ -141,7 +141,7 @@ python -m scripts.run_benchmark --config config/benchmarks/rag-reviewed-educatio
 ## Troubleshooting
 
 - `/ready` is 503: read the per-stage checks; start the named service or install the optional provider package. A missing embedding model is not downloaded by doctor.
-- OCR worker error: verify OCR dependencies and local model cache; ingest reports should retain page warnings. OCR confidence is not recognition accuracy.
+- OCR worker error: inspect the ingest job report for `correlation_id`, `job_id`, page, DPI, model/package versions, input/output pixel dimensions, failure category, return code, and stderr tail. Timeout is retried at most once; native exits and provider/configuration errors are not retried. The worker is reused across pages within one PDF and restarted after 64 pages or at document end. OCR confidence is not recognition accuracy.
 - Ingested document but zero chunks: treat as failed extraction, inspect the job/page report, and do not assume it was indexed.
 - Irrelevant answer: inspect `/retrieve` candidates and signals, relevance decision reasons, and source pages. Do not lower a threshold solely to force an answer.
 - Incompatible vector index: use a new index/collection generation and re-ingest. Do not delete an existing index without a verified backup and explicit operator intent.

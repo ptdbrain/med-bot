@@ -176,9 +176,17 @@ class RAGService:
         replace_doc_id: str | None = None,
         allow_partial: bool = False,
         progress=None,
+        correlation_id: str | None = None,
+        job_id: str | None = None,
     ) -> IngestResult:
         result = self.pipeline.ingest_file(
-            filename, content, replace_doc_id=replace_doc_id, allow_partial=allow_partial, progress=progress
+            filename,
+            content,
+            replace_doc_id=replace_doc_id,
+            allow_partial=allow_partial,
+            progress=progress,
+            correlation_id=correlation_id,
+            job_id=job_id,
         )
         self._sync_bm25()
         return result

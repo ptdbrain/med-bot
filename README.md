@@ -47,7 +47,7 @@ Implemented now:
 - Document library API with listing, chunk counts, and index-aware deletion.
 - Page-level PDF extraction reports, OCR adapter, stable document/revision IDs, and staged index publication.
 - Token-budget chunking option, persistent ingestion jobs, hybrid retrieval diagnostics, and answer/citation validation.
-- Local OCR worker process to isolate Paddle/PyTorch DLL loading on Windows.
+- Per-PDF supervised OCR worker process to isolate Paddle/PyTorch DLL loading; it reuses the model across pages and restarts at a bounded 64-page batch.
 - Functional Next.js research workspace plus a compatible Streamlit demo.
 - FastAPI backend, sample data, Docker files, and tests.
 
@@ -668,7 +668,7 @@ Minimum tests cover:
 - BGE-M3 model download and CPU inference require additional disk, RAM, and startup time.
 - PDF/DOCX ingestion requires optional packages from `requirements.txt`.
 - The current PaddleOCR Vietnamese live fixture lost diacritics despite high confidence; scan-PDF quality is not accepted yet.
-- The conservative OCR render default is 160 DPI with a 2-million-pixel inference cap because the 250-DPI Windows worker exited natively in live checks; each scan page still pays model startup cost.
+- The conservative OCR render default is 160 DPI with a 2-million-pixel inference cap because the 250-DPI Windows worker exited natively in live checks. The OCR worker now persists for up to 64 pages per PDF; live Vietnamese fidelity remains unverified and the OCR quality gate is still FAIL.
 - Human-reviewed support labels and an audited held-out medical-education test set do not exist yet.
 - Live Ollama, Qdrant, complete UI E2E, cloud gateway, and 10k/50k scale tests were not run for this implementation snapshot.
 - Image captioning remains outside the OCR provider contract; demo image processing is not evidence of multimodal semantic understanding.

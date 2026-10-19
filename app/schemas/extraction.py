@@ -43,6 +43,7 @@ class OCRResult:
     blocks: tuple[TextBlock, ...]
     confidence: float | None
     warnings: tuple[str, ...] = ()
+    diagnostics: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass
@@ -53,6 +54,7 @@ class PageExtraction:
     warnings: list[str] = field(default_factory=list)
     metrics: dict[str, float] = field(default_factory=dict)
     status: str = "usable"
+    diagnostics: dict[str, object] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -62,11 +64,15 @@ class PageExtraction:
 class ExtractionReport:
     pages: list[PageExtraction]
     fingerprint: str = "extract-v2"
+    correlation_id: str | None = None
+    job_id: str | None = None
 
     def to_dict(self) -> dict:
         return {
             "pages": [p.to_dict() for p in self.pages],
             "fingerprint": self.fingerprint,
+            "correlation_id": self.correlation_id,
+            "job_id": self.job_id,
             "page_count": len(self.pages),
             "usable_pages": sum(p.status == "usable" for p in self.pages),
             "failed_pages": sum(p.status == "failed" for p in self.pages),

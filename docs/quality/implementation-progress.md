@@ -3,7 +3,7 @@
 Plan: ../superpowers/plans/2026-09-22-rag-quality-completion.md
 Baseline: 43f1371; isolated checkout codex/rag-quality.
 Baseline tests: 94 passed, 1 skipped, 4 subtests (Python 3.13).
-Latest verification: backend 139 passed, 1 skipped, 4 subtests; web 12 passed; Ruff/Black, Docker Compose config, and diff check passed.
+Latest verification after upstream integration: backend 191 passed, 1 skipped, 4 subtests; reviewed dataset validator 16/16; Ruff, OCR-scope Black, and Docker Compose config passed. Repo-wide Black check still reports six upstream formatting issues.
 
 ## Decisions
 
@@ -20,7 +20,7 @@ Latest verification: backend 139 passed, 1 skipped, 4 subtests; web 12 passed; R
 1. Runtime profiles/readiness: implemented; demo ready. Local is blocked by missing Ollama and Qdrant; provider model availability is not fully probed.
 2. Evaluation corpus/labels: 120 synthetic cases and fixtures built; 0 reviewed. Human-quality gate remains open.
 3. Extraction contracts/identity: implemented and covered by tests.
-4. PDF/OCR: text/scan/mixed routing and isolated OCR adapter implemented; live English fixture succeeded at 160 DPI, Vietnamese fixture failed intermittently, and 250 DPI caused native worker exits. CER/WER are not established; OCR gate FAIL.
+4. PDF/OCR: text/scan/mixed routing and supervised per-PDF JSONL worker implemented; request batches are capped at 64, only timeout gets one retry, and crash diagnostics are correlated to jobs/pages. A two-page English scan stayed in one worker (requests 1 and 2); Vietnamese fixture still fails intermittently, and 250 DPI caused native exits. CER/WER are not established; OCR gate FAIL.
 5. Normalization/layout: core normalization, repeated-margin filtering, and column ordering implemented; comprehensive table/layout gold validation remains open.
 6. Token chunking: token budget chunker implemented and unit tested; live embedding tokenizer/truncation verification remains open.
 7. Index publication: staged revisions, active revision filtering, and rollback tests implemented; process-kill/Qdrant failure-injection matrix remains open.
