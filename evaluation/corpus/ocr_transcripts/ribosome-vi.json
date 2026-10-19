@@ -1,0 +1,24 @@
+{
+  "evidence_id": "ribosome-vi",
+  "source_pdf": "evaluation/corpus/ribosome-vi-scan.pdf",
+  "text": "<!-- page:1 -->\nRibosome\n\nRibosome tổng hợp protein theo thông tin từ RNA thông tin. Ribosome chứa RNA ribosome và protein.",
+  "language": "vi",
+  "confidence": 0.93,
+  "method": "ocr",
+  "blocks": [
+    {
+      "block_id": "ribosome-vi-b1",
+      "page_number": 1,
+      "kind": "heading",
+      "text": "Ribosome",
+      "confidence": 0.98
+    },
+    {
+      "block_id": "ribosome-vi-b2",
+      "page_number": 1,
+      "kind": "paragraph",
+      "text": "Ribosome tổng hợp protein theo thông tin từ RNA thông tin. Ribosome chứa RNA ribosome và protein.",
+      "confidence": 0.94
+    }
+  ]
+}

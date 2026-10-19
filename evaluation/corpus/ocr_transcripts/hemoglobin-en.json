@@ -1,0 +1,24 @@
+{
+  "evidence_id": "hemoglobin-en",
+  "source_pdf": "evaluation/corpus/hemoglobin-en-scan.pdf",
+  "text": "<!-- page:1 -->\nHemoglobin\n\nHemoglobin transports oxygen in red blood cells. Its heme group contains iron.",
+  "language": "en",
+  "confidence": 0.96,
+  "method": "ocr",
+  "blocks": [
+    {
+      "block_id": "hemoglobin-en-b1",
+      "page_number": 1,
+      "kind": "heading",
+      "text": "Hemoglobin",
+      "confidence": 0.98
+    },
+    {
+      "block_id": "hemoglobin-en-b2",
+      "page_number": 1,
+      "kind": "paragraph",
+      "text": "Hemoglobin transports oxygen in red blood cells. Its heme group contains iron.",
+      "confidence": 0.94
+    }
+  ]
+}

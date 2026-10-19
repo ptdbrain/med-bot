@@ -1,0 +1,17 @@
+{
+  "profile": "demo",
+  "overrides": {
+    "DATA_DIR": "data/quality-benchmark-ocr",
+    "VECTOR_STORE_PROVIDER": "memory"
+  },
+  "corpus": "evaluation/corpus/manifest.json",
+  "corpus_source": "ocr",
+  "cases": "evaluation/cases",
+  "modes": [
+    "bm25",
+    "lexical_vector",
+    "lexical_hybrid",
+    "lexical_rerank"
+  ],
+  "generate": false
+}

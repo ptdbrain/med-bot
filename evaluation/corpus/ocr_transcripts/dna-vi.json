@@ -1,0 +1,24 @@
+{
+  "evidence_id": "dna-vi",
+  "source_pdf": "evaluation/corpus/dna-vi-scan.pdf",
+  "text": "<!-- page:1 -->\nDNA\n\nDNA lưu trữ thông tin di truyền. DNA gồm các nucleotide và thường có cấu trúc xoắn kép.",
+  "language": "vi",
+  "confidence": 0.93,
+  "method": "ocr",
+  "blocks": [
+    {
+      "block_id": "dna-vi-b1",
+      "page_number": 1,
+      "kind": "heading",
+      "text": "DNA",
+      "confidence": 0.98
+    },
+    {
+      "block_id": "dna-vi-b2",
+      "page_number": 1,
+      "kind": "paragraph",
+      "text": "DNA lưu trữ thông tin di truyền. DNA gồm các nucleotide và thường có cấu trúc xoắn kép.",
+      "confidence": 0.94
+    }
+  ]
+}

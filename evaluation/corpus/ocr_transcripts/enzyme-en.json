@@ -1,0 +1,24 @@
+{
+  "evidence_id": "enzyme-en",
+  "source_pdf": "evaluation/corpus/enzyme-en-scan.pdf",
+  "text": "<!-- page:1 -->\nEnzyme\n\nEnzymes lower activation energy. Enzymes are catalysts and are not consumed by the reaction.",
+  "language": "en",
+  "confidence": 0.96,
+  "method": "ocr",
+  "blocks": [
+    {
+      "block_id": "enzyme-en-b1",
+      "page_number": 1,
+      "kind": "heading",
+      "text": "Enzyme",
+      "confidence": 0.98
+    },
+    {
+      "block_id": "enzyme-en-b2",
+      "page_number": 1,
+      "kind": "paragraph",
+      "text": "Enzymes lower activation energy. Enzymes are catalysts and are not consumed by the reaction.",
+      "confidence": 0.94
+    }
+  ]
+}

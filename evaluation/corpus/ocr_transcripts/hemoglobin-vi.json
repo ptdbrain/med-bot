@@ -1,0 +1,24 @@
+{
+  "evidence_id": "hemoglobin-vi",
+  "source_pdf": "evaluation/corpus/hemoglobin-vi-scan.pdf",
+  "text": "<!-- page:1 -->\nHemoglobin\n\nHemoglobin vận chuyển oxy trong hồng cầu. Nhóm heme của hemoglobin chứa sắt.",
+  "language": "vi",
+  "confidence": 0.93,
+  "method": "ocr",
+  "blocks": [
+    {
+      "block_id": "hemoglobin-vi-b1",
+      "page_number": 1,
+      "kind": "heading",
+      "text": "Hemoglobin",
+      "confidence": 0.98
+    },
+    {
+      "block_id": "hemoglobin-vi-b2",
+      "page_number": 1,
+      "kind": "paragraph",
+      "text": "Hemoglobin vận chuyển oxy trong hồng cầu. Nhóm heme của hemoglobin chứa sắt.",
+      "confidence": 0.94
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "evidence_id": "atp-en",
+  "source_pdf": "evaluation/corpus/atp-en-scan.pdf",
+  "text": "<!-- page:1 -->\nATP\n\nATP transfers energy between cellular reactions. ATP contains adenine, ribose and three phosphate groups.",
+  "language": "en",
+  "confidence": 0.96,
+  "method": "ocr",
+  "blocks": [
+    {
+      "block_id": "atp-en-b1",
+      "page_number": 1,
+      "kind": "heading",
+      "text": "ATP",
+      "confidence": 0.98
+    },
+    {
+      "block_id": "atp-en-b2",
+      "page_number": 1,
+      "kind": "paragraph",
+      "text": "ATP transfers energy between cellular reactions. ATP contains adenine, ribose and three phosphate groups.",
+      "confidence": 0.94
+    }
+  ]
+}

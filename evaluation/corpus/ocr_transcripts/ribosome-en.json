@@ -1,0 +1,24 @@
+{
+  "evidence_id": "ribosome-en",
+  "source_pdf": "evaluation/corpus/ribosome-en-scan.pdf",
+  "text": "<!-- page:1 -->\nRibosome\n\nRibosomes synthesize proteins using information from messenger RNA. Ribosomes contain ribosomal RNA and proteins.",
+  "language": "en",
+  "confidence": 0.96,
+  "method": "ocr",
+  "blocks": [
+    {
+      "block_id": "ribosome-en-b1",
+      "page_number": 1,
+      "kind": "heading",
+      "text": "Ribosome",
+      "confidence": 0.98
+    },
+    {
+      "block_id": "ribosome-en-b2",
+      "page_number": 1,
+      "kind": "paragraph",
+      "text": "Ribosomes synthesize proteins using information from messenger RNA. Ribosomes contain ribosomal RNA and proteins.",
+      "confidence": 0.94
+    }
+  ]
+}

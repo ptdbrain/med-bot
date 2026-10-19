@@ -1,0 +1,24 @@
+{
+  "evidence_id": "membrane-vi",
+  "source_pdf": "evaluation/corpus/membrane-vi-scan.pdf",
+  "text": "<!-- page:1 -->\nCell membrane\n\nMàng tế bào là lớp kép lipid. Protein màng hỗ trợ vận chuyển chọn lọc.",
+  "language": "vi",
+  "confidence": 0.93,
+  "method": "ocr",
+  "blocks": [
+    {
+      "block_id": "membrane-vi-b1",
+      "page_number": 1,
+      "kind": "heading",
+      "text": "Cell membrane",
+      "confidence": 0.98
+    },
+    {
+      "block_id": "membrane-vi-b2",
+      "page_number": 1,
+      "kind": "paragraph",
+      "text": "Màng tế bào là lớp kép lipid. Protein màng hỗ trợ vận chuyển chọn lọc.",
+      "confidence": 0.94
+    }
+  ]
+}

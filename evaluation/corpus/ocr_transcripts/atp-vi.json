@@ -1,0 +1,24 @@
+{
+  "evidence_id": "atp-vi",
+  "source_pdf": "evaluation/corpus/atp-vi-scan.pdf",
+  "text": "<!-- page:1 -->\nATP\n\nATP chuyển năng lượng giữa các phản ứng tế bào. ATP gồm adenine, ribose và ba nhóm phosphate.",
+  "language": "vi",
+  "confidence": 0.93,
+  "method": "ocr",
+  "blocks": [
+    {
+      "block_id": "atp-vi-b1",
+      "page_number": 1,
+      "kind": "heading",
+      "text": "ATP",
+      "confidence": 0.98
+    },
+    {
+      "block_id": "atp-vi-b2",
+      "page_number": 1,
+      "kind": "paragraph",
+      "text": "ATP chuyển năng lượng giữa các phản ứng tế bào. ATP gồm adenine, ribose và ba nhóm phosphate.",
+      "confidence": 0.94
+    }
+  ]
+}

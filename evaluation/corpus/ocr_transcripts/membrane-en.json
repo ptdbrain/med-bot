@@ -1,0 +1,24 @@
+{
+  "evidence_id": "membrane-en",
+  "source_pdf": "evaluation/corpus/membrane-en-scan.pdf",
+  "text": "<!-- page:1 -->\nCell membrane\n\nThe cell membrane is a lipid bilayer. Membrane proteins support selective transport.",
+  "language": "en",
+  "confidence": 0.96,
+  "method": "ocr",
+  "blocks": [
+    {
+      "block_id": "membrane-en-b1",
+      "page_number": 1,
+      "kind": "heading",
+      "text": "Cell membrane",
+      "confidence": 0.98
+    },
+    {
+      "block_id": "membrane-en-b2",
+      "page_number": 1,
+      "kind": "paragraph",
+      "text": "The cell membrane is a lipid bilayer. Membrane proteins support selective transport.",
+      "confidence": 0.94
+    }
+  ]
+}
