@@ -7,7 +7,7 @@ from app.evaluation.benchmark import run_benchmark
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=Path, default=Path("config/benchmarks/rag-quality.json"))
+    parser.add_argument("--config", type=Path, default=Path("config/benchmarks/rag-demo-regression.json"))
     parser.add_argument("--split", choices=["dev", "test"], default="dev")
     parser.add_argument("--output", type=Path, default=Path("data/reports/rag-dev.json"))
     parser.add_argument("--allow-draft", action="store_true")

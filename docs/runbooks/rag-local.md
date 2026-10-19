@@ -64,34 +64,39 @@ Evaluation distinguishes **development regression checks** (pipeline verificatio
 
 ### 1. Development Regression (Pipeline Verification)
 
-All 120 current synthetic evaluation cases in `evaluation/cases/` are assistant-authored drafts (`reviewed_by: null`). To verify pipeline mechanics, retrieval algorithms (BM25, Dense, Hybrid, Reranking), and ranking metrics calculation without halting at dataset review validation, run with `--allow-draft`:
+All 120 current synthetic evaluation cases in `evaluation/cases/` are assistant-authored drafts (`reviewed_by: null`). To verify pipeline mechanics without halting at dataset review validation, run regression using `config/benchmarks/rag-demo-regression.json`:
 
 ```powershell
-python -m scripts.run_benchmark --config config/benchmarks/rag-quality.json --split dev --output data/reports/rag-dev.json --allow-draft
+python -m scripts.run_benchmark --config config/benchmarks/rag-demo-regression.json --split dev --output data/reports/rag-dev.json --allow-draft
 ```
 
 For rapid local testing during development, add `--limit <N>`:
 
 ```powershell
-python -m scripts.run_benchmark --config config/benchmarks/rag-quality.json --split dev --output data/reports/rag-dev.json --allow-draft --limit 10
+python -m scripts.run_benchmark --config config/benchmarks/rag-demo-regression.json --split dev --output data/reports/rag-dev.json --allow-draft --limit 10
 ```
+
+> [!NOTE]
+> **Truthful Mode Naming in Demo Regression**
+> In the demo profile, retrieval modes are accurately named by the actual algorithms executed: `bm25` (sparse BM25), `lexical_vector` (in-memory token matching), `lexical_hybrid` (lexical RRF fusion), and `lexical_rerank` (lexical overlap heuristic). They must not be mislabeled as neural `dense` or `rerank`.
 
 > [!WARNING]
 > **Quality Gate Status: `not_evaluated_unreviewed`**
 > Reports generated with `--allow-draft` explicitly retain `"dataset_reviewed": false` and `"quality_gate": "not_evaluated_unreviewed"`. Successful execution with exit code 0 verifies pipeline execution mechanics only; **it is not an accuracy claim and must never be presented as a clinical quality certification or production sign-off.**
 
-### 2. Release Evaluation Gate (Clinical Ground Truth)
+### 2. Local RAG Quality Evaluation Gate (Real Neural Stack & Clinical Ground Truth)
 
-Official quality gate certification for release candidates strictly disallows draft cases. Running without `--allow-draft` enforces that every evaluation case has been reviewed and signed off by a clinical domain expert (`reviewed_by != null`):
+Official quality gate certification for release candidates evaluates the real neural retrieval stack (`bm25`, `dense`, `hybrid`, `rerank`) using `config/benchmarks/rag-quality.json`. It strictly disallows draft cases and requires live neural models:
 
 ```powershell
 # Pre-flight check: verify that all cases in dataset are reviewed
 python -m scripts.validate_eval_dataset --corpus evaluation/corpus/manifest.json --cases evaluation/cases --require-review
 
-# Official release evaluation on frozen held-out test split (requires reviewed cases)
+# Official release evaluation on frozen held-out test split (requires reviewed cases & live services)
 python -m scripts.run_benchmark --config config/benchmarks/rag-quality.json --split test --output data/reports/rag-release.json
 ```
 
+- **Strict Validation Guard**: If `dense` or `rerank` modes are requested while using lexical fallback providers, or if Qdrant / neural models are offline, the benchmark immediately halts with a configuration error rather than outputting misleading numbers.
 - If any case in the dataset is unreviewed, this command intentionally halts with `ValueError: Invalid evaluation dataset: ...:unreviewed` (exit code 1) to block unauthorized release.
 - Never tune hyper-parameters on the held-out test split. Test evaluation must be run exactly once against a frozen release candidate.
 - Real-world clinical quality acceptance requires verified human ground-truth labels, a live local model stack (`RAG_PROFILE=local`), and human claim/citation audit.

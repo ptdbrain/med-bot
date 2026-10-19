@@ -57,6 +57,9 @@ SUPPORTED_RAG_MODES = {
     "multi_query",
     "corrective",
     "agentic",
+    "lexical_vector",
+    "lexical_hybrid",
+    "lexical_rerank",
 }
 
 
@@ -283,7 +286,16 @@ class RAGService:
             return ChatResult(
                 answer=self.guardrails.with_disclaimer(message), sources=[], retrieved_chunks=[], mode_used=mode
             )
-        selected_mode = self.agentic_router.choose_mode(clean_question) if mode == "agentic" else mode
+        if mode == "agentic":
+            selected_mode = self.agentic_router.choose_mode(clean_question)
+        elif mode == "lexical_hybrid":
+            selected_mode = "hybrid"
+        elif mode == "lexical_rerank":
+            selected_mode = "rerank"
+        elif mode == "lexical_vector":
+            selected_mode = "naive"
+        else:
+            selected_mode = mode
         self._ensure_bm25_current()
         results = filter_relevant_results(
             clean_question, self.retrieve(clean_question, top_k, selected_mode), self.relevance_policy
@@ -304,8 +316,12 @@ class RAGService:
             )
         if mode == "agentic":
             mode = self.agentic_router.choose_mode(clean_query)
-        if mode == "naive":
+        if mode in {"naive", "lexical_vector"}:
             return self.vector_store.search(clean_query, top_k=top_k)
+        if mode == "lexical_hybrid":
+            return self._rag_for_mode("hybrid").retrieve(clean_query, top_k=top_k)
+        if mode == "lexical_rerank":
+            return self._rag_for_mode("rerank").retrieve(clean_query, top_k=top_k)
         return self._rag_for_mode(mode).retrieve(clean_query, top_k=top_k)
 
     def _sync_bm25(self) -> None:

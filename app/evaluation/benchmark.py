@@ -6,7 +6,9 @@ import platform
 import time
 from pathlib import Path
 
-from app.config import resolve_profile
+import requests
+
+from app.config import Settings, resolve_profile
 from app.evaluation.dataset import load_cases, validate_cases
 from app.evaluation.metrics import percentile, ranking_metrics
 from app.rag.service import RAGService
@@ -14,7 +16,7 @@ from app.retrieval.index_manifest import embedding_fingerprint
 from app.retrieval.vector_store import normalize_text
 
 
-def _normalized(text):
+def _normalized(text: str) -> str:
     return " ".join(normalize_text(text).split())
 
 
@@ -28,7 +30,57 @@ def resolve_evidence(results, evidence):
     return identifiers
 
 
-def run_benchmark(config: Path, split: str, output: Path, *, allow_draft=False, limit=None):
+def validate_benchmark_config(settings: Settings, modes: list[str]) -> None:
+    is_lexical_embedding = settings.embedding_provider.strip().lower() == "lexical"
+    is_memory_store = settings.vector_store_provider.strip().lower() in {"memory", "local"}
+    is_lexical_reranker = settings.reranker_provider.strip().lower() == "lexical"
+
+    if "dense" in modes and (is_lexical_embedding or is_memory_store):
+        raise ValueError(
+            f"Configuration error: Mode 'dense' requested, but current configuration uses lexical fallback "
+            f"(embedding_provider='{settings.embedding_provider}', "
+            f"vector_store_provider='{settings.vector_store_provider}'). "
+            "Mode 'dense' requires a neural dense embedding provider and vector store (e.g. Qdrant or sqlite-dense). "
+            "For deterministic demo regression, use mode name 'lexical_vector' instead."
+        )
+
+    if "hybrid" in modes and (is_lexical_embedding or is_memory_store):
+        raise ValueError(
+            f"Configuration error: Mode 'hybrid' requested, but current configuration uses lexical fallback "
+            f"(embedding_provider='{settings.embedding_provider}', "
+            f"vector_store_provider='{settings.vector_store_provider}'). "
+            "Mode 'hybrid' represents fusion of sparse BM25 and neural dense retrieval. "
+            "For deterministic demo regression, use mode name 'lexical_hybrid' instead."
+        )
+
+    if "rerank" in modes and is_lexical_reranker:
+        raise ValueError(
+            "Configuration error: Mode 'rerank' requested, but reranker_provider is 'lexical'. "
+            "Mode 'rerank' represents a trained neural cross-encoder reranker model. "
+            "For deterministic demo regression, use mode name 'lexical_rerank' instead."
+        )
+
+    if any(m in modes for m in ("dense", "hybrid")) and settings.vector_store_provider == "qdrant":
+        try:
+            resp = requests.get(f"{settings.qdrant_url.rstrip('/')}/collections", timeout=2)
+            resp.raise_for_status()
+        except (requests.RequestException, OSError, ValueError) as exc:
+            raise ValueError(
+                f"Configuration error: Local RAG quality benchmark requires a running Qdrant instance "
+                f"at {settings.qdrant_url}, but connection failed: {exc}"
+            ) from exc
+
+    if "rerank" in modes and settings.reranker_provider == "cross-encoder":
+        import importlib.util
+
+        if importlib.util.find_spec("sentence_transformers") is None:
+            raise ValueError(
+                "Configuration error: Local RAG quality benchmark with mode 'rerank' requires "
+                "'sentence_transformers' for cross-encoder reranker, but the package is not installed."
+            )
+
+
+def run_benchmark(config: Path, split: str, output: Path, *, allow_draft: bool = False, limit: int | None = None):
     raw = config.read_bytes()
     options = json.loads(raw)
     manifest_path = Path(options.get("corpus", "evaluation/corpus/manifest.json"))
@@ -46,6 +98,10 @@ def run_benchmark(config: Path, split: str, output: Path, *, allow_draft=False, 
     data_root = settings.data_dir.resolve()
     if data_root == Path("data").resolve():
         raise ValueError("Benchmark requires a separate DATA_DIR")
+
+    modes = options.get("modes", ["bm25", "dense", "hybrid", "rerank"])
+    validate_benchmark_config(settings, modes)
+
     service = RAGService(settings)
     for source in sorted({value["source_path"] for value in manifest["evidence"].values()}):
         path = Path(source)
@@ -53,7 +109,6 @@ def run_benchmark(config: Path, split: str, output: Path, *, allow_draft=False, 
     cases = [case for case in all_cases if case.split == split]
     if limit is not None:
         cases = cases[:limit]
-    modes = options.get("modes", ["bm25", "dense", "hybrid", "rerank"])
     details = []
     for case in cases:
         for mode in modes:
@@ -73,8 +128,12 @@ def run_benchmark(config: Path, split: str, output: Path, *, allow_draft=False, 
                 else:
                     if mode == "bm25":
                         results = service.bm25_store.search(case.question, top_k=10)
-                    elif mode == "dense":
+                    elif mode in {"dense", "lexical_vector", "memory_lexical"}:
                         results = service.vector_store.search(case.question, top_k=10)
+                    elif mode in {"hybrid", "lexical_hybrid", "hybrid_lexical"}:
+                        results = service.retrieve(case.question, top_k=10, rag_mode="hybrid")
+                    elif mode in {"rerank", "lexical_rerank", "rerank_lexical"}:
+                        results = service.retrieve(case.question, top_k=10, rag_mode="rerank")
                     else:
                         results = service.retrieve(case.question, top_k=10, rag_mode=mode)
                     predicted = resolve_evidence(results, manifest["evidence"])
@@ -88,7 +147,12 @@ def run_benchmark(config: Path, split: str, output: Path, *, allow_draft=False, 
                     row["refused"] = not any(d.accepted for d in decisions)
                     row["reasons"] = [d.reasons for d in decisions]
                     if options.get("generate", False):
-                        answer = service.chat(case.question, rag_mode="rerank")
+                        gen_mode = (
+                            "rerank"
+                            if mode in {"rerank", "lexical_rerank", "rerank_lexical"}
+                            else ("hybrid" if mode in {"hybrid", "lexical_hybrid", "hybrid_lexical"} else mode)
+                        )
+                        answer = service.chat(case.question, rag_mode=gen_mode)
                         row["answer"] = answer.answer
                         row["answer_validation"] = answer.validation
             except Exception as exc:  # noqa: BLE001 - Record a failed case rather than dropping its denominator.
@@ -126,6 +190,7 @@ def run_benchmark(config: Path, split: str, output: Path, *, allow_draft=False, 
     report = {
         "split": split,
         "case_count": len(cases),
+        "benchmark_type": "demo_regression" if settings.profile == "demo" else "local_rag_quality",
         "dataset_reviewed": all(c.reviewed_by for c in cases),
         "quality_gate": (
             "not_evaluated_unreviewed" if not all(c.reviewed_by for c in cases) else "requires_answer_and_human_audit"
@@ -133,6 +198,8 @@ def run_benchmark(config: Path, split: str, output: Path, *, allow_draft=False, 
         "config_sha256": hashlib.sha256(raw).hexdigest(),
         "corpus_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
         "embedding_fingerprint": embedding_fingerprint(settings),
+        "embedding_provider": settings.embedding_provider,
+        "vector_store_provider": settings.vector_store_provider,
         "llm_provider": settings.llm_provider,
         "reranker_provider": settings.reranker_provider,
         "python": platform.python_version(),

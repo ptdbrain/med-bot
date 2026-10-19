@@ -1,0 +1,16 @@
+{
+  "profile": "demo",
+  "overrides": {
+    "DATA_DIR": "data/quality-benchmark-demo",
+    "VECTOR_STORE_PROVIDER": "memory"
+  },
+  "corpus": "evaluation/corpus/manifest.json",
+  "cases": "evaluation/cases",
+  "modes": [
+    "bm25",
+    "lexical_vector",
+    "lexical_hybrid",
+    "lexical_rerank"
+  ],
+  "generate": false
+}

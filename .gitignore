@@ -9,7 +9,7 @@ __pycache__/
 .superpowers/
 data/reports/
 data/logs/
-data/quality-benchmark/
+data/quality-benchmark*/
 data/raw/*
 data/processed/*
 data/indexes/*

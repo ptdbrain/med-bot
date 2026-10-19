@@ -1,8 +1,16 @@
 {
-  "profile": "demo",
-  "overrides": {"DATA_DIR": "data/quality-benchmark", "VECTOR_STORE_PROVIDER": "memory"},
+  "profile": "local",
+  "overrides": {
+    "DATA_DIR": "data/quality-benchmark-local",
+    "VECTOR_STORE_PROVIDER": "qdrant"
+  },
   "corpus": "evaluation/corpus/manifest.json",
   "cases": "evaluation/cases",
-  "modes": ["bm25", "dense", "hybrid", "rerank"],
+  "modes": [
+    "bm25",
+    "dense",
+    "hybrid",
+    "rerank"
+  ],
   "generate": false
 }
