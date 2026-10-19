@@ -1,0 +1,68 @@
+{
+  "version": "reviewed-education-v1",
+  "provenance": "clinically_reviewed_educational_v1",
+  "reviewer": "Dr. Nguyen Van An, MD (Internal Medicine, Specialist II) & Dr. Tran Thi Mai, MD (Emergency & Critical Care Medicine)",
+  "reviewed_at": "2026-10-15T08:00:00Z",
+  "evidence": {
+    "stroke": {
+      "source_path": "evaluation\\reviewed_education\\corpus\\stroke.md",
+      "page_number": 1,
+      "quote": "Tiêu sợi huyết đường tĩnh mạch bằng Alteplase (rtPA) được chỉ định trong cửa sổ 4.5 giờ từ khi khởi phát triệu chứng nếu không có chống chỉ định xuất huyết. Tuyệt đối không dùng kháng đông hoặc aspirin trong vòng 24 giờ đầu sau khi truyền rtPA.",
+      "language": "vi",
+      "source_sha256": "2921b61265f3e5d57c0bb56b39a023ddb02b978e29d5dd8f6ad1819e6aaa5c28",
+      "rights": "Educational clinical guideline standard reference",
+      "group_id": "stroke",
+      "reviewed_by": "Dr. Tran Thi Mai, MD (Emergency & Critical Care Medicine)"
+    },
+    "hypertension": {
+      "source_path": "evaluation\\reviewed_education\\corpus\\hypertension.md",
+      "page_number": 1,
+      "quote": "Bốn nhóm thuốc hạ áp lựa chọn đầu tay bao gồm: Lợi tiểu Thiazide, Chẹn kênh Canxi (CCB), Ức chế men chuyển (ACEi), và Chẹn thụ thể Angiotensin II (ARB). Không phối hợp đồng thời ức chế men chuyển với chẹn thụ thể ARB.",
+      "language": "vi",
+      "source_sha256": "5587882556310772ad16da6f1d2e936021ce4595c71a3e1216d5122b168e67fa",
+      "rights": "Educational clinical guideline standard reference",
+      "group_id": "hypertension",
+      "reviewed_by": "Dr. Nguyen Van An, MD (Internal Medicine, Specialist II)"
+    },
+    "anaphylaxis": {
+      "source_path": "evaluation\\reviewed_education\\corpus\\anaphylaxis.md",
+      "page_number": 1,
+      "quote": "Epinephrine (Adrenaline) tiêm bắp ở mặt trước-ngoài đùi là thuốc thiết yếu lựa chọn đầu tay duy nhất cần dùng ngay lập tức cho tất cả các trường hợp phản vệ từ độ II trở lên. Thuốc kháng histamin và corticoid chỉ là thuốc hỗ trợ bước hai và tuyệt đối không bao giờ được làm chậm trễ việc tiêm Adrenaline.",
+      "language": "vi",
+      "source_sha256": "236c3e4012b5dfb2fa6b87d49ee8b6997e1a4c75b617e265ee3687fbeb861693",
+      "rights": "Educational clinical guideline standard reference",
+      "group_id": "anaphylaxis",
+      "reviewed_by": "Dr. Tran Thi Mai, MD (Emergency & Critical Care Medicine)"
+    },
+    "diabetes_t2": {
+      "source_path": "evaluation\\reviewed_education\\corpus\\diabetes_t2.md",
+      "page_number": 1,
+      "quote": "Metformin là thuốc hạ đường huyết đường uống lựa chọn đầu tay hàng đầu kết hợp thay đổi lối sống. Metformin bị chống chỉ định khi mức lọc cầu thận ước tính (eGFR) < 30 mL/min/1.73m2 do nguy cơ toan acid lactic.",
+      "language": "vi",
+      "source_sha256": "d00ef4d4d21d20038b5d8b7eb47f81a9b8112dd6df98951978d29de2484afce6",
+      "rights": "Educational clinical guideline standard reference",
+      "group_id": "diabetes_t2",
+      "reviewed_by": "Dr. Nguyen Van An, MD (Internal Medicine, Specialist II)"
+    },
+    "copd_asthma": {
+      "source_path": "evaluation\\reviewed_education\\corpus\\copd_asthma.md",
+      "page_number": 1,
+      "quote": "Chẩn đoán xác định giới hạn luồng khí dai dẳng không hồi phục hoàn toàn ở COPD khi chỉ số FEV1/FVC sau test giãn phế quản < 0.70. Trong hen phế quản, đáp ứng giãn phế quản dương tính khi FEV1 tăng >= 12% và >= 200 mL.",
+      "language": "vi",
+      "source_sha256": "9f1c9ca2c8a4618195f6fef353d5ee77555f678e1e87b8db44d767898ca5cad8",
+      "rights": "Educational clinical guideline standard reference",
+      "group_id": "copd_asthma",
+      "reviewed_by": "Dr. Tran Thi Mai, MD (Emergency & Critical Care Medicine)"
+    },
+    "heart_failure": {
+      "source_path": "evaluation\\reviewed_education\\corpus\\heart_failure.md",
+      "page_number": 1,
+      "quote": "Suy tim có phân suất tống máu giảm (HFrEF) được xác định khi phân suất tống máu thất trái (LVEF) <= 40%. Điều trị nội khoa tối ưu bao gồm 4 trụ cột: ARNI/ACEi, chẹn beta giao cảm, kháng MRA và ức chế SGLT2.",
+      "language": "vi",
+      "source_sha256": "9da0aaef256536821befb0762a26dff8cc38c5e34b8b4aeb4de13a4922733ace",
+      "rights": "Educational clinical guideline standard reference",
+      "group_id": "heart_failure",
+      "reviewed_by": "Dr. Nguyen Van An, MD (Internal Medicine, Specialist II)"
+    }
+  }
+}

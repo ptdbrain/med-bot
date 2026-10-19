@@ -1,0 +1,4 @@
+# Chẩn đoán và Điều trị Tăng Huyết Áp
+
+Theo khuyến cáo ACC/AHA, huyết áp bình thường là < 120/80 mmHg; tăng huyết áp Giai đoạn 1 khi huyết áp tâm thu 130-139 mmHg hoặc tâm trương 80-89 mmHg; Giai đoạn 2 khi huyết áp tâm thu >= 140 mmHg hoặc tâm trương >= 90 mmHg.
+Bốn nhóm thuốc hạ áp lựa chọn đầu tay bao gồm: Lợi tiểu Thiazide, Chẹn kênh Canxi (CCB), Ức chế men chuyển (ACEi), và Chẹn thụ thể Angiotensin II (ARB). Không phối hợp đồng thời ức chế men chuyển với chẹn thụ thể ARB vì tăng nguy cơ suy thận và tăng kali máu. Với tăng huyết áp Giai đoạn 2 vượt huyết áp đích >= 20/10 mmHg, khuyến cáo khởi đầu ngay phối hợp hai thuốc hạ áp khác cơ chế tác dụng.

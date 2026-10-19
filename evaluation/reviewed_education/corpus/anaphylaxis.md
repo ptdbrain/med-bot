@@ -1,0 +1,3 @@
+# Phác đồ Cấp cứu Phản vệ
+
+Phản vệ là phản ứng dị ứng toàn thân nghiêm trọng đe dọa tính mạng xuất hiện nhanh chóng sau khi tiếp xúc dị nguyên. Epinephrine (Adrenaline) tiêm bắp ở mặt trước-ngoài đùi là thuốc thiết yếu lựa chọn đầu tay duy nhất cần dùng ngay lập tức cho tất cả các trường hợp phản vệ từ độ II trở lên. Liều dùng cho người lớn là 0.3 đến 0.5 mg (dung dịch 1:1000 ống 1mg/1ml), tiêm bắp, nhắc lại sau 5-15 phút nếu cần. Thuốc kháng histamin và corticoid chỉ là thuốc hỗ trợ bước hai và tuyệt đối không bao giờ được làm chậm trễ việc tiêm Adrenaline. Đặt bệnh nhân nằm ngửa đầu bằng, chân kê cao.

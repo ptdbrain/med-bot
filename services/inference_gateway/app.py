@@ -15,11 +15,11 @@ from app.config import Settings, get_settings
 from app.embeddings.factory import create_embedding_provider
 from app.ingestion.ocr.factory import create_ocr_provider
 from app.llm.factory import create_llm
+from app.rag.context_builder import PackedContext
 from app.retrieval.index_manifest import embedding_fingerprint
 from app.retrieval.reranker_factory import create_reranker
-from app.schemas.document import Chunk, ChunkMetadata, SearchResult
 from app.schemas.answer import CitedClaim
-from app.rag.context_builder import PackedContext
+from app.schemas.document import Chunk, ChunkMetadata, SearchResult
 
 Text = Annotated[str, Field(min_length=1, max_length=24000)]
 

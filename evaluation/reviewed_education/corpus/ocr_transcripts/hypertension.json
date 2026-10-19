@@ -1,0 +1,24 @@
+{
+  "evidence_id": "hypertension",
+  "source_file": "evaluation/reviewed_education/corpus/hypertension.md",
+  "text": "<!-- page:1 -->\nChẩn đoán và Điều trị Tăng Huyết Áp (Hypertension Guidelines)\n\nBốn nhóm thuốc hạ áp lựa chọn đầu tay bao gồm: Lợi tiểu Thiazide, Chẹn kênh Canxi (CCB), Ức chế men chuyển (ACEi), và Chẹn thụ thể Angiotensin II (ARB). Không phối hợp đồng thời ức chế men chuyển với chẹn thụ thể ARB.",
+  "language": "vi",
+  "confidence": 0.95,
+  "method": "ocr",
+  "blocks": [
+    {
+      "block_id": "hypertension-h1",
+      "page_number": 1,
+      "kind": "heading",
+      "text": "Chẩn đoán và Điều trị Tăng Huyết Áp (Hypertension Guidelines)",
+      "confidence": 0.97
+    },
+    {
+      "block_id": "hypertension-p1",
+      "page_number": 1,
+      "kind": "paragraph",
+      "text": "Bốn nhóm thuốc hạ áp lựa chọn đầu tay bao gồm: Lợi tiểu Thiazide, Chẹn kênh Canxi (CCB), Ức chế men chuyển (ACEi), và Chẹn thụ thể Angiotensin II (ARB). Không phối hợp đồng thời ức chế men chuyển với chẹn thụ thể ARB.",
+      "confidence": 0.94
+    }
+  ]
+}

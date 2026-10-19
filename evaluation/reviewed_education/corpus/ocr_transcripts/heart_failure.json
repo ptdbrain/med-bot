@@ -1,0 +1,24 @@
+{
+  "evidence_id": "heart_failure",
+  "source_file": "evaluation/reviewed_education/corpus/heart_failure.md",
+  "text": "<!-- page:1 -->\nSuy tim Phân suất Tống máu Giảm HFrEF (Heart Failure with Reduced Ejection Fraction)\n\nSuy tim có phân suất tống máu giảm (HFrEF) được xác định khi phân suất tống máu thất trái (LVEF) <= 40%. Điều trị nội khoa tối ưu bao gồm 4 trụ cột: ARNI/ACEi, chẹn beta giao cảm, kháng MRA và ức chế SGLT2.",
+  "language": "vi",
+  "confidence": 0.95,
+  "method": "ocr",
+  "blocks": [
+    {
+      "block_id": "heart_failure-h1",
+      "page_number": 1,
+      "kind": "heading",
+      "text": "Suy tim Phân suất Tống máu Giảm HFrEF (Heart Failure with Reduced Ejection Fraction)",
+      "confidence": 0.97
+    },
+    {
+      "block_id": "heart_failure-p1",
+      "page_number": 1,
+      "kind": "paragraph",
+      "text": "Suy tim có phân suất tống máu giảm (HFrEF) được xác định khi phân suất tống máu thất trái (LVEF) <= 40%. Điều trị nội khoa tối ưu bao gồm 4 trụ cột: ARNI/ACEi, chẹn beta giao cảm, kháng MRA và ức chế SGLT2.",
+      "confidence": 0.94
+    }
+  ]
+}

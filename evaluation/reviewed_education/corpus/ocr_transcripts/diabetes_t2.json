@@ -1,0 +1,24 @@
+{
+  "evidence_id": "diabetes_t2",
+  "source_file": "evaluation/reviewed_education/corpus/diabetes_t2.md",
+  "text": "<!-- page:1 -->\nChẩn đoán Đái tháo đường Tuýp 2 (Type 2 Diabetes Clinical Management)\n\nMetformin là thuốc hạ đường huyết đường uống lựa chọn đầu tay hàng đầu kết hợp thay đổi lối sống. Metformin bị chống chỉ định khi mức lọc cầu thận ước tính (eGFR) < 30 mL/min/1.73m2 do nguy cơ toan acid lactic.",
+  "language": "vi",
+  "confidence": 0.95,
+  "method": "ocr",
+  "blocks": [
+    {
+      "block_id": "diabetes_t2-h1",
+      "page_number": 1,
+      "kind": "heading",
+      "text": "Chẩn đoán Đái tháo đường Tuýp 2 (Type 2 Diabetes Clinical Management)",
+      "confidence": 0.97
+    },
+    {
+      "block_id": "diabetes_t2-p1",
+      "page_number": 1,
+      "kind": "paragraph",
+      "text": "Metformin là thuốc hạ đường huyết đường uống lựa chọn đầu tay hàng đầu kết hợp thay đổi lối sống. Metformin bị chống chỉ định khi mức lọc cầu thận ước tính (eGFR) < 30 mL/min/1.73m2 do nguy cơ toan acid lactic.",
+      "confidence": 0.94
+    }
+  ]
+}

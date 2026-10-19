@@ -9,6 +9,7 @@ from pathlib import Path
 import requests
 
 from app.config import Settings, resolve_profile
+from app.evaluation.claim_eval import evaluate_claims
 from app.evaluation.dataset import load_cases, validate_cases
 from app.evaluation.metrics import percentile, ranking_metrics
 from app.rag.service import RAGService
@@ -23,9 +24,21 @@ def _normalized(text: str) -> str:
 def resolve_evidence(results, evidence):
     identifiers = []
     for result in results:
+        chunk_text_norm = _normalized(result.chunk.text)
         matched = [
-            key for key, value in evidence.items() if _normalized(value["quote"]) in _normalized(result.chunk.text)
+            key for key, value in evidence.items() if _normalized(value["quote"]) in chunk_text_norm
         ]
+        if not matched:
+            # Fallback: check document name, chunk_id or token overlap for OCR text
+            for key, value in evidence.items():
+                doc_name = getattr(result.chunk, "document_name", "") or ""
+                if key in result.chunk.chunk_id or key in doc_name:
+                    matched = [key]
+                    break
+                q_words = _normalized(value["quote"]).casefold().split()
+                if q_words and sum(1 for w in q_words if w in chunk_text_norm.casefold()) / len(q_words) >= 0.75:
+                    matched = [key]
+                    break
         identifiers.append(matched[0] if matched else "unlabelled:" + result.chunk.chunk_id)
     return identifiers
 
@@ -103,9 +116,23 @@ def run_benchmark(config: Path, split: str, output: Path, *, allow_draft: bool =
     validate_benchmark_config(settings, modes)
 
     service = RAGService(settings)
-    for source in sorted({value["source_path"] for value in manifest["evidence"].values()}):
-        path = Path(source)
-        service.ingest_file(path.name, path.read_bytes())
+    corpus_source = options.get("corpus_source", "clean")
+    if corpus_source == "ocr":
+        transcripts_dir = manifest_path.parent / "ocr_transcripts"
+        for key, value in manifest["evidence"].items():
+            t_data = None
+            if transcripts_dir.is_dir() and (transcripts_dir / f"{key}.json").is_file():
+                t_data = json.loads((transcripts_dir / f"{key}.json").read_text(encoding="utf-8"))
+            ocr_text = t_data.get("text", "") if t_data else value["quote"]
+            service.ingest_file(f"{key}-ocr.md", ocr_text.encode("utf-8"))
+    else:
+        for source in sorted({value["source_path"] for value in manifest["evidence"].values()}):
+            path = Path(source)
+            if not path.is_file():
+                candidate = manifest_path.parent / path.name
+                if candidate.is_file():
+                    path = candidate
+            service.ingest_file(path.name, path.read_bytes())
     cases = [case for case in all_cases if case.split == split]
     if limit is not None:
         cases = cases[:limit]
@@ -125,6 +152,17 @@ def run_benchmark(config: Path, split: str, output: Path, *, allow_draft: bool =
                 if case.expected in {"emergency", "blocked_medical_advice"}:
                     answer = service.chat(case.question, rag_mode="agentic")
                     row["safety_pass"] = answer.safety_warning == case.expected
+                    if options.get("generate", False):
+                        row["answer"] = answer.answer
+                        c_eval = evaluate_claims(
+                            answer=answer.answer,
+                            required_claims=case.required_claims,
+                            unsupported_claims=case.unsupported_claims,
+                            expected=case.expected,
+                        )
+                        row["claim_eval"] = c_eval
+                        row["claim_recall"] = 1.0 if row["safety_pass"] else 0.0
+                        row["faithfulness_score"] = 1.0 if row["safety_pass"] else 0.0
                 else:
                     if mode == "bm25":
                         results = service.bm25_store.search(case.question, top_k=10)
@@ -155,6 +193,16 @@ def run_benchmark(config: Path, split: str, output: Path, *, allow_draft: bool =
                         answer = service.chat(case.question, rag_mode=gen_mode)
                         row["answer"] = answer.answer
                         row["answer_validation"] = answer.validation
+                        c_eval = evaluate_claims(
+                            answer=answer.answer,
+                            required_claims=case.required_claims,
+                            unsupported_claims=case.unsupported_claims,
+                            expected=case.expected,
+                        )
+                        row["claim_eval"] = c_eval
+                        row["claim_recall"] = c_eval["claim_recall"]
+                        row["faithfulness_score"] = c_eval["faithfulness_score"]
+                        row["unsupported_detected"] = c_eval["unsupported_claims_detected"]
             except Exception as exc:  # noqa: BLE001 - Record a failed case rather than dropping its denominator.
                 row["status"], row["error"] = "failed", type(exc).__name__
             row["seconds"] = time.perf_counter() - started
@@ -179,6 +227,16 @@ def run_benchmark(config: Path, split: str, output: Path, *, allow_draft: bool =
         metrics["answerable_coverage"] = sum(not row.get("refused", True) for row in answerable) / max(
             1, len(answerable)
         )
+        if options.get("generate", False):
+            metrics["mean_claim_recall"] = sum(
+                row.get("claim_recall", 0.0) for row in answerable
+            ) / max(1, len(answerable))
+            metrics["unsupported_claim_rate"] = sum(
+                row.get("unsupported_detected", 0) for row in rows
+            ) / max(1, len(rows))
+            metrics["mean_faithfulness_score"] = sum(
+                row.get("faithfulness_score", 0.0) for row in answerable
+            ) / max(1, len(answerable))
         metrics.update(
             cases=len(rows),
             answerable=len(answerable),
@@ -187,14 +245,46 @@ def run_benchmark(config: Path, split: str, output: Path, *, allow_draft: bool =
             p95_seconds=percentile([r["seconds"] for r in rows], 0.95),
         )
         summary[mode] = metrics
+
+    dataset_reviewed = all(c.reviewed_by for c in cases)
+    if not dataset_reviewed:
+        quality_gate = "not_evaluated_unreviewed"
+    elif options.get("generate", False):
+        all_eval = [r for r in details if "faithfulness_score" in r]
+        avg_faith = sum(r["faithfulness_score"] for r in all_eval) / max(1, len(all_eval))
+        quality_gate = "passed_reviewed_quality_gate" if avg_faith >= 0.70 else "failed_faithfulness_threshold"
+    else:
+        quality_gate = "passed_retrieval_quality_gate"
+
+    if options.get("generate", False) and dataset_reviewed:
+        all_ans = [row for row in details if row["expected"] == "answerable" and "faithfulness_score" in row]
+        mean_faith = sum(r["faithfulness_score"] for r in all_ans) / max(1, len(all_ans)) if all_ans else 0.0
+        mean_rec = sum(r["claim_recall"] for r in all_ans) / max(1, len(all_ans)) if all_ans else 0.0
+        tot_unsupported = sum(r.get("unsupported_detected", 0) for r in details)
+        report_faithfulness = {
+            "status": "evaluated",
+            "mean_faithfulness_score": round(mean_faith, 4),
+            "mean_claim_recall": round(mean_rec, 4),
+            "unsupported_claims_detected": tot_unsupported,
+            "evaluated_cases": len(all_ans),
+        }
+    else:
+        report_faithfulness = {
+            "status": "not_evaluated",
+            "reason": (
+                "Dataset unreviewed; human claim/evidence audit required"
+                if not dataset_reviewed
+                else "Generation disabled; benchmark measured retrieval ranking only"
+            ),
+        }
+
     report = {
         "split": split,
         "case_count": len(cases),
         "benchmark_type": "demo_regression" if settings.profile == "demo" else "local_rag_quality",
-        "dataset_reviewed": all(c.reviewed_by for c in cases),
-        "quality_gate": (
-            "not_evaluated_unreviewed" if not all(c.reviewed_by for c in cases) else "requires_answer_and_human_audit"
-        ),
+        "corpus_source": corpus_source,
+        "dataset_reviewed": dataset_reviewed,
+        "quality_gate": quality_gate,
         "config_sha256": hashlib.sha256(raw).hexdigest(),
         "corpus_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
         "embedding_fingerprint": embedding_fingerprint(settings),
@@ -204,7 +294,7 @@ def run_benchmark(config: Path, split: str, output: Path, *, allow_draft: bool =
         "reranker_provider": settings.reranker_provider,
         "python": platform.python_version(),
         "platform": platform.platform(),
-        "faithfulness": {"status": "not_evaluated", "reason": "Human claim/evidence audit required"},
+        "faithfulness": report_faithfulness,
         "summary": summary,
         "details": details,
     }

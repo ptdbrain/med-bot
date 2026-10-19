@@ -1,0 +1,24 @@
+{
+  "evidence_id": "anaphylaxis",
+  "source_file": "evaluation/reviewed_education/corpus/anaphylaxis.md",
+  "text": "<!-- page:1 -->\nPhác đồ Cấp cứu Phản vệ (Emergency Anaphylaxis Management)\n\nEpinephrine (Adrenaline) tiêm bắp ở mặt trước-ngoài đùi là thuốc thiết yếu lựa chọn đầu tay duy nhất cần dùng ngay lập tức cho tất cả các trường hợp phản vệ từ độ II trở lên. Thuốc kháng histamin và corticoid chỉ là thuốc hỗ trợ bước hai và tuyệt đối không bao giờ được làm chậm trễ việc tiêm Adrenaline.",
+  "language": "vi",
+  "confidence": 0.95,
+  "method": "ocr",
+  "blocks": [
+    {
+      "block_id": "anaphylaxis-h1",
+      "page_number": 1,
+      "kind": "heading",
+      "text": "Phác đồ Cấp cứu Phản vệ (Emergency Anaphylaxis Management)",
+      "confidence": 0.97
+    },
+    {
+      "block_id": "anaphylaxis-p1",
+      "page_number": 1,
+      "kind": "paragraph",
+      "text": "Epinephrine (Adrenaline) tiêm bắp ở mặt trước-ngoài đùi là thuốc thiết yếu lựa chọn đầu tay duy nhất cần dùng ngay lập tức cho tất cả các trường hợp phản vệ từ độ II trở lên. Thuốc kháng histamin và corticoid chỉ là thuốc hỗ trợ bước hai và tuyệt đối không bao giờ được làm chậm trễ việc tiêm Adrenaline.",
+      "confidence": 0.94
+    }
+  ]
+}

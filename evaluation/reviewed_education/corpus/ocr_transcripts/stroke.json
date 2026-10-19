@@ -1,0 +1,24 @@
+{
+  "evidence_id": "stroke",
+  "source_file": "evaluation/reviewed_education/corpus/stroke.md",
+  "text": "<!-- page:1 -->\nXử trí Đột quỵ Thiếu máu Não Cấp (Acute Ischemic Stroke Management)\n\nTiêu sợi huyết đường tĩnh mạch bằng Alteplase (rtPA) được chỉ định trong cửa sổ 4.5 giờ từ khi khởi phát triệu chứng nếu không có chống chỉ định xuất huyết. Tuyệt đối không dùng kháng đông hoặc aspirin trong vòng 24 giờ đầu sau khi truyền rtPA.",
+  "language": "vi",
+  "confidence": 0.95,
+  "method": "ocr",
+  "blocks": [
+    {
+      "block_id": "stroke-h1",
+      "page_number": 1,
+      "kind": "heading",
+      "text": "Xử trí Đột quỵ Thiếu máu Não Cấp (Acute Ischemic Stroke Management)",
+      "confidence": 0.97
+    },
+    {
+      "block_id": "stroke-p1",
+      "page_number": 1,
+      "kind": "paragraph",
+      "text": "Tiêu sợi huyết đường tĩnh mạch bằng Alteplase (rtPA) được chỉ định trong cửa sổ 4.5 giờ từ khi khởi phát triệu chứng nếu không có chống chỉ định xuất huyết. Tuyệt đối không dùng kháng đông hoặc aspirin trong vòng 24 giờ đầu sau khi truyền rtPA.",
+      "confidence": 0.94
+    }
+  ]
+}

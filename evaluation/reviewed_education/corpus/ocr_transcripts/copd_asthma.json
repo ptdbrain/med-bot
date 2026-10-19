@@ -1,0 +1,24 @@
+{
+  "evidence_id": "copd_asthma",
+  "source_file": "evaluation/reviewed_education/corpus/copd_asthma.md",
+  "text": "<!-- page:1 -->\nPhân biệt Hen Phế quản và COPD (Asthma vs COPD Differentiation)\n\nChẩn đoán xác định giới hạn luồng khí dai dẳng không hồi phục hoàn toàn ở COPD khi chỉ số FEV1/FVC sau test giãn phế quản < 0.70. Trong hen phế quản, đáp ứng giãn phế quản dương tính khi FEV1 tăng >= 12% và >= 200 mL.",
+  "language": "vi",
+  "confidence": 0.95,
+  "method": "ocr",
+  "blocks": [
+    {
+      "block_id": "copd_asthma-h1",
+      "page_number": 1,
+      "kind": "heading",
+      "text": "Phân biệt Hen Phế quản và COPD (Asthma vs COPD Differentiation)",
+      "confidence": 0.97
+    },
+    {
+      "block_id": "copd_asthma-p1",
+      "page_number": 1,
+      "kind": "paragraph",
+      "text": "Chẩn đoán xác định giới hạn luồng khí dai dẳng không hồi phục hoàn toàn ở COPD khi chỉ số FEV1/FVC sau test giãn phế quản < 0.70. Trong hen phế quản, đáp ứng giãn phế quản dương tính khi FEV1 tăng >= 12% và >= 200 mL.",
+      "confidence": 0.94
+    }
+  ]
+}

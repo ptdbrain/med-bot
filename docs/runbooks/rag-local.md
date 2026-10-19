@@ -101,6 +101,43 @@ python -m scripts.run_benchmark --config config/benchmarks/rag-quality.json --sp
 - Never tune hyper-parameters on the held-out test split. Test evaluation must be run exactly once against a frozen release candidate.
 - Real-world clinical quality acceptance requires verified human ground-truth labels, a live local model stack (`RAG_PROFILE=local`), and human claim/citation audit.
 
+### 3. Independent OCR Benchmark (Extraction Error Measurement)
+
+To evaluate text extraction quality separately from retrieval logic, run the independent OCR benchmark:
+
+```powershell
+python -m scripts.run_ocr_benchmark --manifest evaluation/corpus/manifest.json --output data/reports/ocr-benchmark.json
+```
+
+- **Metrics evaluated**: Character Error Rate (CER), Word Error Rate (WER), Vietnamese diacritic preservation rate, evidence quote containment, and per-page latency.
+- Decouples OCR degradation from search ranking: a low retrieval recall may stem from OCR character corruption rather than ranking algorithm flaws.
+
+### 4. OCR Retrieval Experiment Slice
+
+Compare retrieval effectiveness on clean Markdown vs OCR-extracted text:
+
+```powershell
+# Retrieval benchmark on OCR-extracted documents
+python -m scripts.run_benchmark --config config/benchmarks/rag-ocr-retrieval.json --split dev --output data/reports/rag-ocr-dev.json --allow-draft
+```
+
+Diffing `data/reports/rag-dev.json` (clean) against `data/reports/rag-ocr-dev.json` (OCR) quantifies the exact retrieval degradation (Recall@5, nDCG@5 drop) caused by optical character recognition errors.
+
+### 5. Clinically-Reviewed Education Benchmark & Claim-Level Faithfulness
+
+To evaluate genuine clinical competence, use `reviewed-education-v1` (`evaluation/reviewed_education/`) covering acute ischemic stroke FAST, emergency anaphylaxis, hypertension management, type 2 diabetes, asthma/COPD differentiation, and heart failure:
+
+```powershell
+# 1. Retrieval benchmark on clinically-reviewed dataset (passes without --allow-draft)
+python -m scripts.run_benchmark --config config/benchmarks/rag-reviewed-education.json --split dev --output data/reports/rag-reviewed-dev.json
+
+# 2. End-to-end generation benchmark with claim verification and hallucination penalty
+python -m scripts.run_benchmark --config config/benchmarks/rag-reviewed-education-gen.json --split dev --output data/reports/rag-reviewed-gen-dev.json
+```
+
+- **Claim-Level Accuracy & Faithfulness**: Verifies whether each claim in `case.required_claims` is supported in the generated answer (`claim_recall`), detects clinical hallucinations in `case.unsupported_claims` (`unsupported_claim_rate`), and computes `mean_faithfulness_score`.
+- Quality gate succeeds (`passed_reviewed_quality_gate`) only when all cases are clinically reviewed and `mean_faithfulness_score >= 0.70`.
+
 ## Troubleshooting
 
 - `/ready` is 503: read the per-stage checks; start the named service or install the optional provider package. A missing embedding model is not downloaded by doctor.

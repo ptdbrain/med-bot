@@ -1,0 +1,4 @@
+# Xử trí Đột quỵ Thiếu máu Não Cấp
+
+Dấu hiệu cảnh báo sớm đột quỵ bao gồm quy tắc FAST: Mặt méo (Face), Yếu tay (Arm), Rối loạn ngôn ngữ (Speech), và Thời gian gọi cấp cứu (Time).
+Tiêu sợi huyết đường tĩnh mạch bằng Alteplase (rtPA) được chỉ định trong cửa sổ 4.5 giờ từ khi khởi phát triệu chứng nếu không có chống chỉ định xuất huyết. Can thiệp lấy huyết khối cơ học bằng dụng cụ (EVT) được xem xét trong vòng 6 đến 24 giờ đối với tắc mạch máu lớn vòng tuần hoàn trước. Trước khi dùng rtPA, huyết áp mục tiêu phải được kiểm soát dưới 185/110 mmHg. Tuyệt đối không dùng kháng đông hoặc aspirin trong vòng 24 giờ đầu sau khi truyền rtPA.

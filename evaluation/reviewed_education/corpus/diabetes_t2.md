@@ -1,0 +1,4 @@
+# Chẩn đoán Đái tháo đường Tuýp 2
+
+Tiêu chuẩn chẩn đoán đái tháo đường bao gồm: HbA1c >= 6.5%, hoặc đường huyết tương lúc đói >= 126 mg/dL (7.0 mmol/L), hoặc đường huyết 2 giờ sau nghiệm pháp dung nạp 75g glucose >= 200 mg/dL.
+Metformin là thuốc hạ đường huyết đường uống lựa chọn đầu tay hàng đầu kết hợp thay đổi lối sống. Metformin bị chống chỉ định khi mức lọc cầu thận ước tính (eGFR) < 30 mL/min/1.73m2 do nguy cơ toan acid lactic nghiêm trọng. Ở bệnh nhân đái tháo đường có bệnh tim mạch do xơ vữa hoặc suy tim hoặc bệnh thận mạn, ưu tiên phối hợp thêm nhóm ức chế SGLT2 hoặc đồng vận thụ thể GLP-1.
