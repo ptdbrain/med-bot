@@ -9,6 +9,10 @@ def create_embedding_provider(
     settings: Settings,
 ) -> EmbeddingProvider | None:
     provider = settings.embedding_provider.strip().lower()
+    if provider == "http":
+        from app.embeddings.http import HTTPEmbedding
+
+        return HTTPEmbedding(settings)
     if provider in {"lexical", "local"}:
         return None
     if provider == "sentence-transformers":

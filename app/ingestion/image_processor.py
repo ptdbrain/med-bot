@@ -45,6 +45,33 @@ class ImageProcessor(DocumentLoader):
         self.captioner = captioner or MockImageCaptioner()
 
     def load(self, path: Path, content: bytes) -> Document:
+        if hasattr(self.ocr, "recognize"):
+            from dataclasses import asdict
+
+            result = self.ocr.recognize(content, page_number=1, languages=("vi", "en"))
+            ocr_text = "\n".join(block.text for block in result.blocks).strip()
+            if not ocr_text:
+                raise ValueError("OCR returned no usable text")
+            return self._document(
+                path,
+                ocr_text,
+                {
+                    "image_path": path.as_posix(),
+                    "ocr_provider": self.ocr.name,
+                    "ocr_confidence": result.confidence,
+                    "extraction": {
+                        "pages": [
+                            {
+                                "page_number": 1,
+                                "classification": "scan",
+                                "status": "usable",
+                                "blocks": [asdict(block) for block in result.blocks],
+                                "warnings": list(result.warnings),
+                            }
+                        ]
+                    },
+                },
+            )
         ocr_text = self.ocr.extract_text(path.name, content).strip()
         caption = self.captioner.caption(path.name, content).strip()
         if not ocr_text and not caption:

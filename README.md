@@ -6,6 +6,11 @@ This project is not a diagnostic bot, not a prescribing tool, and not a replacem
 
 > Thông tin chỉ phục vụ học tập/tham khảo, không thay thế tư vấn của bác sĩ.
 
+Current quality status and known blockers are recorded in
+[`docs/quality/quality-report.md`](docs/quality/quality-report.md). The included
+evaluation set is synthetic and unreviewed; it is not a medical accuracy
+benchmark.
+
 For a Vietnamese interview-style explanation of the model architecture,
 chunking, hybrid retrieval, reranking, evaluation, and troubleshooting, see
 [`docs/RAG_INTERVIEW_VI.md`](docs/RAG_INTERVIEW_VI.md).
@@ -40,6 +45,9 @@ Implemented now:
 - Provider-based image OCR/caption boundary with a deterministic mock default.
 - Audio questions, searchable audio lectures, and searchable video transcripts.
 - Document library API with listing, chunk counts, and index-aware deletion.
+- Page-level PDF extraction reports, OCR adapter, stable document/revision IDs, and staged index publication.
+- Token-budget chunking option, persistent ingestion jobs, hybrid retrieval diagnostics, and answer/citation validation.
+- Local OCR worker process to isolate Paddle/PyTorch DLL loading on Windows.
 - Functional Next.js research workspace plus a compatible Streamlit demo.
 - FastAPI backend, sample data, Docker files, and tests.
 
@@ -227,6 +235,14 @@ streamlit run frontend/streamlit_app.py
 Backend default: `http://localhost:8000`  
 Next.js frontend: `http://localhost:3000`
 Legacy Streamlit frontend: `http://localhost:8501`
+
+For profile-specific setup, readiness checks, queued ingestion, recovery, and
+evaluation caveats, use [`docs/runbooks/rag-local.md`](docs/runbooks/rag-local.md).
+The default `demo` profile is deterministic and does not prove semantic model
+quality. `local` opts into Ollama, BGE-M3, Qdrant, PaddleOCR, and the
+cross-encoder; these dependencies and model weights must be installed and
+available. `GET /ready` checks configured providers, while `GET /health` only
+reports process liveness and index counts.
 
 ## Real-Model RAG
 
@@ -540,6 +556,11 @@ document when content changes.
 
 ## Evaluation
 
+The `evaluation/` corpus and cases are assistant-authored synthetic drafts.
+Use `--allow-draft` only for pipeline development; reports must remain marked
+`not_evaluated_unreviewed` until qualified reviewers approve the evidence and
+answers. See the protocol and current blockers in `docs/quality/`.
+
 Run:
 
 ```bash
@@ -567,9 +588,8 @@ headings or four numbered answer blocks. Both are measured only on answerable
 cases; safety-blocked and insufficient-context cases are expected to have no
 citations.
 
-Latest local smoke snapshot (2026-07-31, six cases, not a clinical
-benchmark): Hit@5 `1.000`, MRR `0.833`, and `1.000` for citation, answer
-format, disclaimer, insufficient-context handling, and safety.
+Older smoke snapshots below this point were produced before the current
+quality pipeline and are not release evidence. Use the current report instead.
 
 ## Tests
 
@@ -592,7 +612,12 @@ Minimum tests cover:
 ## API Endpoints
 
 - `GET /health`
+- `GET /ready`
 - `POST /ingest/file`
+- `POST /ingest/jobs` (queued upload, returns HTTP 202)
+- `GET /ingest/jobs/{job_id}`
+- `POST /ingest/jobs/{job_id}/cancel`
+- `POST /ingest/jobs/{job_id}/retry`
 - `POST /ingest/url`
 - `GET /documents`
 - `DELETE /documents/{doc_id}`
@@ -642,10 +667,14 @@ Minimum tests cover:
 - Real embedding and Qdrant are optional; the default remains deterministic lexical matching.
 - BGE-M3 model download and CPU inference require additional disk, RAM, and startup time.
 - PDF/DOCX ingestion requires optional packages from `requirements.txt`.
-- Image OCR/caption defaults are still mock providers.
+- The current PaddleOCR Vietnamese live fixture lost diacritics despite high confidence; scan-PDF quality is not accepted yet.
+- The conservative OCR render default is 160 DPI with a 2-million-pixel inference cap because the 250-DPI Windows worker exited natively in live checks; each scan page still pays model startup cost.
+- Human-reviewed support labels and an audited held-out medical-education test set do not exist yet.
+- Live Ollama, Qdrant, complete UI E2E, cloud gateway, and 10k/50k scale tests were not run for this implementation snapshot.
+- Image captioning remains outside the OCR provider contract; demo image processing is not evidence of multimodal semantic understanding.
 - Audio defaults to mock STT unless the optional `faster-whisper` dependency and provider setting are enabled.
 - Video is transcript-only and depends on the configured STT provider.
-- The rule-based query transformer and reranker are deterministic baselines, not learned models.
+- The rule-based query transformer and lexical reranker are deterministic baselines, not learned models; the optional cross-encoder path requires its model and live evaluation.
 - The mock LLM summarizes retrieved chunks; it is not a clinical reasoning model.
 
 ## Medical Use Warning

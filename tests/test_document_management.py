@@ -126,7 +126,7 @@ class DocumentManagementTests(unittest.TestCase):
                     )
                 },
             ).json()
-            raw_path = root / "raw" / "stroke.md"
+            raw_path = Path(ingest["source_path"])
             self.assertTrue(raw_path.exists())
 
             deleted = client.delete(f"/documents/{ingest['doc_id']}")

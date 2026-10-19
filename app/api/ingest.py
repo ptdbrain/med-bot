@@ -3,6 +3,7 @@ from __future__ import annotations
 import urllib.request
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, HttpUrl
 
 from app.jobs.crawler import validate_public_url
@@ -17,9 +18,11 @@ class UrlIngestRequest(BaseModel):
 
 @router.post("/file")
 async def ingest_file(request: Request, file: UploadFile = File(...)) -> dict:
-    content = await file.read()
+    content = await file.read(request.app.state.rag_service.settings.max_upload_bytes + 1)
     try:
-        result = request.app.state.rag_service.ingest_file(file.filename or "upload.txt", content)
+        result = await run_in_threadpool(
+            request.app.state.rag_service.ingest_file, file.filename or "upload.txt", content
+        )
     except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return result.__dict__

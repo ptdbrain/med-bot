@@ -23,7 +23,7 @@ class ParentChildRAG:
 
     def retrieve(self, question: str, top_k: int = 5) -> list[SearchResult]:
         children = self.child_retriever.retrieve(question, top_k=top_k * 4)
-        return self.parent_store.expand_parent_results(children, top_k=top_k)
+        return self.parent_store.expand_parent_results(filter_relevant_results(question, children), top_k=top_k)
 
     def answer(self, question: str, top_k: int = 5) -> RagOutput:
         safety = self.guardrails.check(question)

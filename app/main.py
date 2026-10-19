@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import chat, documents, eval, health, image, ingest, upload, video, voice
+from app.api import chat, documents, eval, health, image, ingest, ingest_jobs, upload, video, voice
 from app.config import Settings, get_settings
 from app.rag.service import RAGService
 from app.utils.logging import configure_logging
@@ -27,6 +27,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.state.rag_service = RAGService(settings)
     application.include_router(health.router)
     application.include_router(ingest.router)
+    application.include_router(ingest_jobs.router)
     application.include_router(upload.router)
     application.include_router(documents.router)
     application.include_router(chat.router)

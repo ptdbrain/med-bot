@@ -1,0 +1,114 @@
+{
+  "version": "synthetic-v1",
+  "provenance": "assistant_authored_unreviewed",
+  "evidence": {
+    "enzyme-en": {
+      "source_path": "evaluation\\corpus\\enzyme-en.md",
+      "page_number": 1,
+      "quote": "Enzymes lower activation energy. Enzymes are catalysts and are not consumed by the reaction.",
+      "language": "en",
+      "source_sha256": "998e89ebd404e5716dce0884cb3ae6c0558a7d3d17bde7be1bd3471cca0b09dc",
+      "rights": "Project-authored synthetic educational fixture",
+      "group_id": "enzyme"
+    },
+    "enzyme-vi": {
+      "source_path": "evaluation\\corpus\\enzyme-vi.md",
+      "page_number": 1,
+      "quote": "Enzyme làm giảm năng lượng hoạt hóa. Enzyme là chất xúc tác và không bị tiêu hao trong phản ứng.",
+      "language": "vi",
+      "source_sha256": "3a26fc5e6cb4fd54b90d185b251d40a6d4cc4e1f57ca75511638057bd0d289b6",
+      "rights": "Project-authored synthetic educational fixture",
+      "group_id": "enzyme"
+    },
+    "hemoglobin-en": {
+      "source_path": "evaluation\\corpus\\hemoglobin-en.md",
+      "page_number": 1,
+      "quote": "Hemoglobin transports oxygen in red blood cells. Its heme group contains iron.",
+      "language": "en",
+      "source_sha256": "4fbb6636de60bdc91e15ad7f66bcafb5102f7f1912c13e810c24cf52a3f6dabd",
+      "rights": "Project-authored synthetic educational fixture",
+      "group_id": "hemoglobin"
+    },
+    "hemoglobin-vi": {
+      "source_path": "evaluation\\corpus\\hemoglobin-vi.md",
+      "page_number": 1,
+      "quote": "Hemoglobin vận chuyển oxy trong hồng cầu. Nhóm heme của hemoglobin chứa sắt.",
+      "language": "vi",
+      "source_sha256": "68bb701190fa982fa07dbfae12ad716687cbf34f4671a50b25ebd79131cd3bfb",
+      "rights": "Project-authored synthetic educational fixture",
+      "group_id": "hemoglobin"
+    },
+    "atp-en": {
+      "source_path": "evaluation\\corpus\\atp-en.md",
+      "page_number": 1,
+      "quote": "ATP transfers energy between cellular reactions. ATP contains adenine, ribose and three phosphate groups.",
+      "language": "en",
+      "source_sha256": "d9627cf1b80d609f930f0839b981fbc49f2c0e365ff45661f7a4775234c11ed0",
+      "rights": "Project-authored synthetic educational fixture",
+      "group_id": "atp"
+    },
+    "atp-vi": {
+      "source_path": "evaluation\\corpus\\atp-vi.md",
+      "page_number": 1,
+      "quote": "ATP chuyển năng lượng giữa các phản ứng tế bào. ATP gồm adenine, ribose và ba nhóm phosphate.",
+      "language": "vi",
+      "source_sha256": "96b2d866294eb2eaeb91b76f879aca5f73ad8cc1479dfa5f93c44827b13e1958",
+      "rights": "Project-authored synthetic educational fixture",
+      "group_id": "atp"
+    },
+    "membrane-en": {
+      "source_path": "evaluation\\corpus\\membrane-en.md",
+      "page_number": 1,
+      "quote": "The cell membrane is a lipid bilayer. Membrane proteins support selective transport.",
+      "language": "en",
+      "source_sha256": "23baeb35ffafecdfb905006aa89a1599ef19042c66cb313b06c74f6a3cb0319f",
+      "rights": "Project-authored synthetic educational fixture",
+      "group_id": "membrane"
+    },
+    "membrane-vi": {
+      "source_path": "evaluation\\corpus\\membrane-vi.md",
+      "page_number": 1,
+      "quote": "Màng tế bào là lớp kép lipid. Protein màng hỗ trợ vận chuyển chọn lọc.",
+      "language": "vi",
+      "source_sha256": "f16ddbdc9ffeb6fb85bf76125220025d048c80c41b68fd88cb266d513507fe08",
+      "rights": "Project-authored synthetic educational fixture",
+      "group_id": "membrane"
+    },
+    "dna-en": {
+      "source_path": "evaluation\\corpus\\dna-en.md",
+      "page_number": 1,
+      "quote": "DNA stores genetic information. DNA consists of nucleotides and usually forms a double helix.",
+      "language": "en",
+      "source_sha256": "d0fcc05897eda572d1f6b07d74b1639dd2ddbf4d142de1af01e419b551dd07c5",
+      "rights": "Project-authored synthetic educational fixture",
+      "group_id": "dna"
+    },
+    "dna-vi": {
+      "source_path": "evaluation\\corpus\\dna-vi.md",
+      "page_number": 1,
+      "quote": "DNA lưu trữ thông tin di truyền. DNA gồm các nucleotide và thường có cấu trúc xoắn kép.",
+      "language": "vi",
+      "source_sha256": "5b954de381955bb27bfec4fa129dfc308b9932ce1ff3c4f357ec1c0d04f4ce21",
+      "rights": "Project-authored synthetic educational fixture",
+      "group_id": "dna"
+    },
+    "ribosome-en": {
+      "source_path": "evaluation\\corpus\\ribosome-en.md",
+      "page_number": 1,
+      "quote": "Ribosomes synthesize proteins using information from messenger RNA. Ribosomes contain ribosomal RNA and proteins.",
+      "language": "en",
+      "source_sha256": "ca6b470e148e19f9e6cb8839d2a155c6699c29f3b8271e23d0f18a5835c7586e",
+      "rights": "Project-authored synthetic educational fixture",
+      "group_id": "ribosome"
+    },
+    "ribosome-vi": {
+      "source_path": "evaluation\\corpus\\ribosome-vi.md",
+      "page_number": 1,
+      "quote": "Ribosome tổng hợp protein theo thông tin từ RNA thông tin. Ribosome chứa RNA ribosome và protein.",
+      "language": "vi",
+      "source_sha256": "69110318bfffea9527b4f1f1d63eaf034725b743f5634c9cccca68da6f0b85b5",
+      "rights": "Project-authored synthetic educational fixture",
+      "group_id": "ribosome"
+    }
+  }
+}

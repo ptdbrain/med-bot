@@ -12,6 +12,7 @@ import {
   Video,
 } from "lucide-react";
 import { FormEvent, useState } from "react";
+import { DocumentJob } from "@/features/ingest/document-job";
 
 import {
   ingestUrl,
@@ -97,6 +98,7 @@ export default function IngestPage() {
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (kind === "document") return;
     if (kind === "url" && !url.trim()) return;
     if (kind !== "url" && !file) return;
     mutation.mutate();
@@ -189,7 +191,7 @@ export default function IngestPage() {
             </label>
           )}
 
-          <button
+          {kind === "document" ? <DocumentJob file={file} /> : <button
             className="button button--primary"
             type="submit"
             disabled={
@@ -203,7 +205,7 @@ export default function IngestPage() {
               <FileText size={16} aria-hidden="true" />
             )}
             {mutation.isPending ? "Đang xử lý" : "Ingest và lập chỉ mục"}
-          </button>
+          </button>}
         </form>
 
         {mutation.isError && (

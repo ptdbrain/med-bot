@@ -14,11 +14,14 @@ from app.ingestion.audio_processor import (
 )
 from app.ingestion.html_loader import HtmlLoader
 from app.ingestion.image_processor import ImageProcessor
+from app.ingestion.ocr.factory import create_ocr_provider
 from app.ingestion.pipeline import IngestionPipeline, IngestResult
 from app.ingestion.video_processor import VideoProcessor
 from app.llm.base import LLMProvider
 from app.llm.factory import create_llm
 from app.rag.agentic_router import RuleBasedAgenticRouter
+from app.rag.answer_service import AnswerService
+from app.rag.context_builder import ContextBuilder
 from app.rag.corrective_rag import CorrectiveRAG
 from app.rag.hybrid_rag import HybridRAG
 from app.rag.multi_query_rag import MultiQueryRAG
@@ -28,7 +31,9 @@ from app.rag.rerank_rag import RerankRAG
 from app.retrieval.bm25_store import BM25Store
 from app.retrieval.factory import create_vector_store
 from app.retrieval.metadata_store import SQLiteMetadataStore
+from app.retrieval.publication import ActiveVectorStore
 from app.retrieval.query_transform import RuleBasedQueryTransformer
+from app.retrieval.relevance import RelevancePolicy, filter_relevant_results
 from app.retrieval.reranker_factory import create_reranker
 from app.retrieval.vector_store import VectorStore
 from app.safety.medical_guardrails import MedicalGuardrails
@@ -62,6 +67,7 @@ class ChatResult:
     retrieved_chunks: list[dict]
     mode_used: str
     safety_warning: str | None = None
+    validation: dict | None = None
 
 
 class RAGService:
@@ -82,15 +88,33 @@ class RAGService:
         self.vector_store = (
             vector_store if vector_store is not None else create_vector_store(self.settings, self.embedding_provider)
         )
+        self.vector_store = ActiveVectorStore(self.vector_store, self.metadata_store)
         self.pipeline = IngestionPipeline(self.settings, self.vector_store, self.metadata_store)
         self.guardrails = MedicalGuardrails()
         self.llm = llm if llm is not None else create_llm(self.settings)
+        self.relevance_policy = RelevancePolicy(
+            self.settings.relevance_dense_threshold, self.settings.relevance_reranker_threshold
+        )
+        self.context_builder = ContextBuilder()
+        verifier = None
+        if self.settings.llm_provider == "ollama" and self.settings.answer_validation == "strict":
+            from app.llm.ollama_verifier import OllamaSupportVerifier
+
+            verifier = OllamaSupportVerifier(self.settings)
+        elif self.settings.llm_provider == "http" and self.settings.answer_validation == "strict":
+            from app.llm.http_llm import HTTPSupportVerifier
+
+            verifier = HTTPSupportVerifier(self.settings)
+        self.answer_service = AnswerService(
+            self.llm, self.guardrails, strict=self.settings.answer_validation == "strict", verifier=verifier
+        )
         speech_provider = stt_provider or create_speech_to_text(self.settings)
         self.audio_processor = AudioProcessor(speech_provider)
-        self.image_processor = ImageProcessor()
+        self.image_processor = ImageProcessor(ocr=create_ocr_provider(self.settings))
         self.video_processor = VideoProcessor(speech_provider)
         self.bm25_store = BM25Store()
         self.bm25_store.add_chunks(self.metadata_store.list_chunks())
+        self._bm25_epoch = self.metadata_store.epoch
         self.naive_rag = NaiveRAG(self.vector_store, self.llm, self.guardrails)
         self.hybrid_rag = HybridRAG(
             self.vector_store,
@@ -101,6 +125,8 @@ class RAGService:
             rrf_k=self.settings.hybrid_rrf_k,
             dense_weight=self.settings.hybrid_dense_weight,
             sparse_weight=self.settings.hybrid_sparse_weight,
+            dense_k=self.settings.dense_candidate_k,
+            sparse_k=self.settings.sparse_candidate_k,
         )
         self.query_transformer = RuleBasedQueryTransformer()
         self.rerank_rag = RerankRAG(
@@ -139,8 +165,18 @@ class RAGService:
         count = getattr(self.vector_store, "count", None)
         return int(count) if count is not None else None
 
-    def ingest_file(self, filename: str, content: bytes) -> IngestResult:
-        result = self.pipeline.ingest_file(filename, content)
+    def ingest_file(
+        self,
+        filename: str,
+        content: bytes,
+        *,
+        replace_doc_id: str | None = None,
+        allow_partial: bool = False,
+        progress=None,
+    ) -> IngestResult:
+        result = self.pipeline.ingest_file(
+            filename, content, replace_doc_id=replace_doc_id, allow_partial=allow_partial, progress=progress
+        )
         self._sync_bm25()
         return result
 
@@ -248,13 +284,17 @@ class RAGService:
                 answer=self.guardrails.with_disclaimer(message), sources=[], retrieved_chunks=[], mode_used=mode
             )
         selected_mode = self.agentic_router.choose_mode(clean_question) if mode == "agentic" else mode
-        output = self._rag_for_mode(selected_mode).answer(
-            clean_question,
-            top_k=top_k,
+        self._ensure_bm25_current()
+        results = filter_relevant_results(
+            clean_question, self.retrieve(clean_question, top_k, selected_mode), self.relevance_policy
         )
+        budget = self.settings.context_window_tokens - self.settings.context_output_reserve - 2048
+        packed = self.context_builder.pack(clean_question, results, input_budget=max(0, budget))
+        output = self.answer_service.answer(clean_question, packed)
         return self._format_output(output, mode)
 
     def retrieve(self, query: str, top_k: int = 5, rag_mode: str = "naive") -> list[SearchResult]:
+        self._ensure_bm25_current()
         clean_query = redact_pii(query)
         mode = rag_mode.strip().lower() or "naive"
         if mode not in SUPPORTED_RAG_MODES:
@@ -270,6 +310,11 @@ class RAGService:
 
     def _sync_bm25(self) -> None:
         self.bm25_store.replace_chunks(self.metadata_store.list_chunks())
+        self._bm25_epoch = self.metadata_store.epoch
+
+    def _ensure_bm25_current(self) -> None:
+        if self._bm25_epoch != self.metadata_store.epoch:
+            self._sync_bm25()
 
     def _validate_audio(self, filename: str, content: bytes) -> str:
         validate_size(content, self.settings.max_upload_bytes)
@@ -294,6 +339,7 @@ class RAGService:
             retrieved_chunks=[result.to_dict() for result in output.results],
             mode_used=mode,
             safety_warning=output.safety_warning,
+            validation=output.validation,
         )
 
     def _source_dict(self, result: SearchResult) -> dict:

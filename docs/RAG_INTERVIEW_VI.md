@@ -224,32 +224,24 @@ Khong co mot con so "accuracy cua RAG" duy nhat. Du an tach thanh:
 - disclaimer rate: cau tra loi y khoa co disclaimer bat buoc khong.
 - safety accuracy: emergency va yeu cau chan doan/ke don co bi xu ly dung khong.
 
-Bo eval hien tai la bo smoke test nho, khong phai clinical benchmark va khong
-du de cong bo model dat do chinh xac y khoa. Khi phong van, can noi ro ket qua
-do chat luong cua pipeline tren bo cau hoi noi bo; no khong chung minh tinh
-dung dan lam sang.
+Bo hien tai gom synthetic draft do assistant tao, chua co nguoi review evidence
+va claim. Vi vay benchmark co the dung de kiem tra wiring va regression, nhung
+khong the dung tinh metric do lam accuracy cua he thong. Run hien tai bao
+`not_evaluated_unreviewed`; faithfulness va human citation correctness chua
+duoc danh gia.
 
-Snapshot local ngay 2026-07-31 tren 6 eval cases:
-
-```text
-Hit@5:                         1.000
-MRR:                           0.833
-Citation rate:                 1.000
-Format compliance rate:        1.000
-Disclaimer rate:               1.000
-Insufficient-context accuracy: 1.000
-Safety accuracy:               1.000
-```
-
-Ket qua nay dung BGE-M3, SQLite dense + BM25, Qwen3 4B Instruct 2507 va
-lexical-semantic reranker. Day la pipeline regression snapshot, khong phai
-clinical accuracy.
+Trang thai kiem chung gan nhat (2026-10-19): backend `133 passed, 1 skipped`;
+OCR English scan doc duoc, nhung OCR Vietnamese lam mat nhieu dau/ky tu. OCR
+confidence trung binh theo ky tu gan `0.987` nhung khong phan anh loi nay. Do
+do OCR quality gate dang FAIL. Live Ollama/Qdrant va held-out benchmark da
+review chua chay trong moi truong nay. Chi tiet va han che xem
+`docs/quality/quality-report.md`.
 
 De danh gia nghiem tuc hon, can:
 
-1. Tao bo 100-500 cau hoi tu chinh corpus.
-2. Gan nhan relevant document/chunk boi nguoi co kien thuc domain.
-3. Chia theo exact keyword, paraphrase, Viet-Anh, multi-hop va unanswerable.
+1. Review tung evidence span/claim boi nguoi co kien thuc domain.
+2. Chia train/dev/test theo evidence group truoc khi tao paraphrase.
+3. Bao cao numerator/denominator, unknown, failure, confidence interval va latency.
 4. So sanh BM25, dense, hybrid, hybrid + reranker theo cung mot bo cau hoi.
 5. Theo doi Recall@5/10, nDCG@10, MRR, faithfulness va citation correctness.
 6. Kiem tra regression moi khi doi chunk size, model hoac fusion weight.
@@ -312,9 +304,10 @@ D:\App\Anaconda\Miniconda\python.exe -m scripts.run_eval
 - `sqlite-dense` quet vector trong process, phu hop local corpus nho/vua;
   production nen dung Qdrant va tao payload index.
 - Lexical reranker la baseline; cross-encoder can them RAM va latency.
-- PDF scan can OCR that; mock image caption/STT khong dai dien chat luong
-  production.
-- Evaluation dataset can duoc mo rong va gan nhan boi domain expert.
+- PDF scan co PaddleOCR adapter nhung live Vietnamese fixture chua dat; OCR
+  confidence khong phai CER/WER.
+- Evaluation dataset synthetic can duoc review boi domain expert truoc khi
+  co the bao cao retrieval/answer quality.
 - Can them observability cho latency tung stage, cache query embedding,
   batching va version hoa index theo model/chunk config.
 - Can kiem thu prompt injection trong tai lieu va phan quyen theo collection

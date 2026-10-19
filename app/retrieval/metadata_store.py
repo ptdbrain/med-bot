@@ -28,6 +28,16 @@ class SQLiteMetadataStore:
 
     def _init_db(self) -> None:
         with self._connect() as connection:
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS active_revisions(doc_id TEXT PRIMARY KEY,revision_id TEXT NOT NULL)"
+            )
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS index_revisions(revision_id TEXT PRIMARY KEY,doc_id TEXT NOT NULL,status TEXT NOT NULL,payload TEXT NOT NULL,previous TEXT)"
+            )
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS corpus_epoch(id INTEGER PRIMARY KEY CHECK(id=1),value INTEGER NOT NULL)"
+            )
+            connection.execute("INSERT OR IGNORE INTO corpus_epoch VALUES(1,0)")
             connection.execute("""
                 CREATE TABLE IF NOT EXISTS documents (
                     doc_id TEXT PRIMARY KEY,
@@ -124,8 +134,17 @@ class SQLiteMetadataStore:
         self,
         document: Document,
         chunks: list[Chunk],
+        *,
+        publication: tuple[str, str | None] | None = None,
     ) -> None:
         with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            if publication:
+                current = connection.execute(
+                    "SELECT revision_id FROM active_revisions WHERE doc_id=?", (document.doc_id,)
+                ).fetchone()
+                if (current[0] if current else None) != publication[1]:
+                    raise ValueError("Concurrent document publication; retry against the current revision")
             connection.execute(
                 """
                 INSERT OR REPLACE INTO documents(
@@ -184,11 +203,19 @@ class SQLiteMetadataStore:
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                self._parent_section_rows(chunks),
+                self._parent_section_rows(chunks, document.metadata.get("parents")),
             )
+            if publication:
+                connection.execute(
+                    "INSERT OR REPLACE INTO active_revisions VALUES(?,?)", (document.doc_id, publication[0])
+                )
+                connection.execute(
+                    "UPDATE index_revisions SET status='published' WHERE revision_id=?", (publication[0],)
+                )
+            connection.execute("UPDATE corpus_epoch SET value=value+1 WHERE id=1")
 
     @staticmethod
-    def _parent_section_rows(chunks: list[Chunk]) -> list[tuple]:
+    def _parent_section_rows(chunks: list[Chunk], parents: dict | None = None) -> list[tuple]:
         grouped: dict[str, list[Chunk]] = {}
         for chunk in chunks:
             parent_id = chunk.metadata.parent_id
@@ -201,7 +228,7 @@ class SQLiteMetadataStore:
                 section_chunks[0].metadata.title,
                 section_chunks[0].metadata.section_title,
                 section_chunks[0].metadata.page_number,
-                "\n\n".join(chunk.text for chunk in section_chunks),
+                (parents or {}).get(parent_id, {}).get("text", "\n\n".join(chunk.text for chunk in section_chunks)),
                 json.dumps(
                     section_chunks[0].metadata.to_dict(),
                     ensure_ascii=False,
@@ -214,6 +241,11 @@ class SQLiteMetadataStore:
         with self._connect() as connection:
             row = connection.execute("SELECT COUNT(*) FROM chunks").fetchone()
         return int(row[0])
+
+    @property
+    def epoch(self) -> int:
+        with self._connect() as connection:
+            return int(connection.execute("SELECT value FROM corpus_epoch WHERE id=1").fetchone()[0])
 
     def list_chunks(self) -> list[Chunk]:
         with self._connect() as connection:
@@ -361,6 +393,8 @@ class SQLiteMetadataStore:
                 "DELETE FROM url_sources WHERE doc_id = ?",
                 (doc_id,),
             )
+            connection.execute("DELETE FROM active_revisions WHERE doc_id=?", (doc_id,))
+            connection.execute("UPDATE corpus_epoch SET value=value+1 WHERE id=1")
         return True
 
     def expand_parent_results(
@@ -405,7 +439,14 @@ class SQLiteMetadataStore:
                     text="\n\n".join(chunk.text for chunk in siblings),
                     metadata=parent_metadata,
                 )
-            expanded.append(SearchResult(chunk=parent_chunk, score=child_result.score))
+            parent_chunk.metadata.extra = {
+                **parent_chunk.metadata.extra,
+                "child_excerpt": child.text,
+                "child_chunk_id": child.chunk_id,
+            }
+            expanded.append(
+                SearchResult(chunk=parent_chunk, score=child_result.score, signals=dict(child_result.signals))
+            )
             if len(expanded) >= top_k:
                 break
         return expanded

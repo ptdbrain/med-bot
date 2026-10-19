@@ -25,8 +25,13 @@ class RerankRAG:
         self.candidate_k = candidate_k
 
     def retrieve(self, question: str, top_k: int = 5) -> list[SearchResult]:
-        candidate_k = max(self.candidate_k, top_k * 4)
-        candidates = self.retriever.retrieve(question, top_k=candidate_k)
+        if top_k <= 0:
+            return []
+        candidate_k = max(self.candidate_k, top_k)
+        if hasattr(self.retriever, "retrieve_candidates"):
+            candidates = self.retriever.retrieve_candidates(question)[:candidate_k]
+        else:
+            candidates = self.retriever.retrieve(question, top_k=candidate_k)
         return self.reranker.rerank(question, candidates, top_k=top_k)
 
     def answer(self, question: str, top_k: int = 5) -> RagOutput:

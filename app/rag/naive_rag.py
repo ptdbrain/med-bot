@@ -15,6 +15,7 @@ class RagOutput:
     answer: str
     results: list[SearchResult]
     safety_warning: str | None = None
+    validation: dict | None = None
 
 
 class NaiveRAG:

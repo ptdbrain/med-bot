@@ -25,3 +25,4 @@ class ChatResponse(BaseModel):
     retrieved_chunks: list[dict] = Field(default_factory=list)
     mode_used: str = "naive"
     safety_warning: str | None = None
+    validation: dict | None = None

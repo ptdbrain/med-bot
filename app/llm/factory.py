@@ -8,6 +8,10 @@ from app.llm.ollama_llm import OllamaLLM
 
 def create_llm(settings: Settings) -> LLMProvider:
     provider = settings.llm_provider.strip().lower()
+    if provider == "http":
+        from app.llm.http_llm import HTTPLLM
+
+        return HTTPLLM(settings)
     if provider == "mock":
         return MockLLM()
     if provider == "ollama":

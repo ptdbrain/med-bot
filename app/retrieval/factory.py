@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.config import Settings
 from app.embeddings.base import EmbeddingProvider
 from app.retrieval.dense_store import SQLiteDenseVectorStore
+from app.retrieval.index_manifest import embedding_fingerprint
 from app.retrieval.vector_store import (
     InMemoryVectorStore,
     QdrantVectorStore,
@@ -27,13 +28,14 @@ def create_vector_store(
             embedding_provider=embedding_provider,
             vector_size=settings.embedding_dimension,
             write_batch_size=settings.dense_write_batch_size,
+            embedding_fingerprint=embedding_fingerprint(settings),
         )
     if provider == "qdrant":
         if embedding_provider is None:
             raise ValueError("Qdrant cần dense embedding provider. " "Đặt EMBEDDING_PROVIDER=sentence-transformers.")
         return QdrantVectorStore(
             url=settings.qdrant_url,
-            collection=settings.qdrant_collection,
+            collection=settings.qdrant_collection + "_" + embedding_fingerprint(settings)[:16],
             embedding_provider=embedding_provider,
             vector_size=settings.embedding_dimension,
         )

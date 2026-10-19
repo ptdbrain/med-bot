@@ -23,6 +23,7 @@ class SQLiteDenseVectorStore:
         embedding_provider: EmbeddingProvider,
         vector_size: int,
         write_batch_size: int = 64,
+        embedding_fingerprint: str | None = None,
     ) -> None:
         if vector_size <= 0:
             raise ValueError("vector_size must be positive")
@@ -32,6 +33,7 @@ class SQLiteDenseVectorStore:
         self.embedding_provider = embedding_provider
         self.vector_size = vector_size
         self.write_batch_size = write_batch_size
+        self.embedding_fingerprint = embedding_fingerprint
         ensure_directory(path.parent)
         self._init_db()
 
@@ -46,6 +48,7 @@ class SQLiteDenseVectorStore:
 
     def _init_db(self) -> None:
         with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
             connection.execute("""
                 CREATE TABLE IF NOT EXISTS dense_vectors (
                     chunk_id TEXT PRIMARY KEY,
@@ -63,6 +66,19 @@ class SQLiteDenseVectorStore:
             if row is not None and int(row[0]) != self.vector_size:
                 raise ValueError(
                     "Dense index dimension does not match EMBEDDING_DIMENSION. " "Clear or rebuild the dense index."
+                )
+            if self.embedding_fingerprint:
+                stored = connection.execute(
+                    "SELECT value FROM dense_metadata WHERE key='embedding_fingerprint'"
+                ).fetchone()
+                existing = connection.execute("SELECT COUNT(*) FROM dense_vectors").fetchone()[0]
+                if stored and stored[0] != self.embedding_fingerprint:
+                    raise ValueError("Index embedding fingerprint mismatch; rebuild into a new DENSE_INDEX_PATH")
+                if not stored and existing:
+                    raise ValueError("Legacy dense index has no model fingerprint; rebuild into a new DENSE_INDEX_PATH")
+                connection.execute(
+                    "INSERT OR IGNORE INTO dense_metadata VALUES('embedding_fingerprint',?)",
+                    (self.embedding_fingerprint,),
                 )
             connection.execute(
                 """
@@ -177,6 +193,8 @@ class SQLiteDenseVectorStore:
     def _pack_vector(self, vector: list[float]) -> bytes:
         if len(vector) != self.vector_size:
             raise RuntimeError("Document embedding dimension does not match " "EMBEDDING_DIMENSION.")
+        if not all(math.isfinite(float(v)) for v in vector) or not any(vector):
+            raise ValueError("Invalid embedding: non-finite or zero vector")
         return struct.pack(
             f"<{self.vector_size}f",
             *(float(value) for value in vector),

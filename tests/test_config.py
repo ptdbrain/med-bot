@@ -61,3 +61,15 @@ class SettingsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_dotenv_is_loaded_without_overriding_environment(tmp_path, monkeypatch):
+    (tmp_path / ".env").write_text("RAG_PROFILE=demo\nCHUNK_SIZE=777\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("RAG_PROFILE", raising=False)
+    monkeypatch.delenv("CHUNK_SIZE", raising=False)
+    settings = get_settings()
+    assert settings.chunk_size == 777
+
+    monkeypatch.setenv("CHUNK_SIZE", "888")
+    assert get_settings().chunk_size == 888

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.schemas.retrieval import RetrievalResponse, RetrievedChunk
@@ -10,16 +10,19 @@ router = APIRouter(tags=["chat"])
 
 @router.post("/chat", response_model=ChatResponse)
 def chat(payload: ChatRequest, request: Request) -> ChatResponse:
-    result = request.app.state.rag_service.chat(
-        question=payload.question,
-        rag_mode=payload.rag_mode,
-        top_k=payload.top_k,
-    )
+    try:
+        result = request.app.state.rag_service.chat(
+            question=payload.question, rag_mode=payload.rag_mode, top_k=payload.top_k
+        )
+    except RuntimeError as exc:
+        raise HTTPException(503, "A required RAG provider is unavailable; check readiness and runtime logs") from exc
     return ChatResponse(**result.__dict__)
 
 
 @router.get("/retrieve", response_model=RetrievalResponse)
-def retrieve(query: str, request: Request, top_k: int = 5, rag_mode: str = "naive") -> RetrievalResponse:
+def retrieve(
+    query: str, request: Request, top_k: int = Query(5, ge=1, le=40), rag_mode: str = "naive"
+) -> RetrievalResponse:
     try:
         results = request.app.state.rag_service.retrieve(
             query,

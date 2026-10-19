@@ -4,6 +4,11 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
+.tmp/
+.superpowers/
+data/reports/
+data/logs/
+data/quality-benchmark/
 data/raw/*
 data/processed/*
 data/indexes/*

@@ -17,6 +17,12 @@ class Reranker(Protocol):
     ) -> list[SearchResult]: ...
 
 
+def normalize_logit(value: float) -> float:
+    if not math.isfinite(value):
+        raise ValueError("Reranker returned a non-finite score")
+    return 1.0 / (1.0 + math.exp(-max(-60.0, min(60.0, value))))
+
+
 def _context_text(result: SearchResult) -> str:
     metadata = result.chunk.metadata
     return "\n".join(
@@ -202,7 +208,7 @@ class CrossEncoderReranker:
         rescored: list[SearchResult] = []
         for result, raw_score in zip(results, raw_scores, strict=True):
             logit = _scalar_score(raw_score)
-            semantic_score = 1.0 / (1.0 + math.exp(-max(-60.0, min(60.0, logit))))
+            semantic_score = normalize_logit(logit)
             rescored.append(
                 SearchResult(
                     chunk=result.chunk,
@@ -210,7 +216,8 @@ class CrossEncoderReranker:
                     signals={
                         **result.signals,
                         "reranker_logit": logit,
-                        "semantic_score": round(semantic_score, 6),
+                        "reranker_score": round(semantic_score, 6),
+                        "semantic_score": result.signals.get("semantic_score", round(semantic_score, 6)),
                     },
                 )
             )
@@ -231,5 +238,7 @@ class CrossEncoderReranker:
                 "Cross-encoder reranking requires sentence-transformers. "
                 "Install it with: pip install -r requirements-rag.txt"
             ) from exc
-        self._model = CrossEncoder(self.model_name, device=self.device)
+        from torch import nn
+
+        self._model = CrossEncoder(self.model_name, device=self.device, activation_fn=nn.Identity())
         return self._model

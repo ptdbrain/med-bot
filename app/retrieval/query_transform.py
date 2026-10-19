@@ -10,12 +10,11 @@ class RuleBasedQueryTransformer:
         compact = query.strip()
         if not compact:
             return []
-        variants = [
-            compact,
-            f"giải thích y khoa {compact}",
-            f"tài liệu hướng dẫn về {compact}",
-        ]
-        return list(dict.fromkeys(variants))
+        comparison = re.sub(r"^(?:so sánh|so sanh|compare)\s+", "", compact, flags=re.IGNORECASE)
+        if comparison == compact:
+            return [compact]
+        parts = re.split(r"\s+(?:và|va|với|versus|vs\.?|and)\s+", comparison, maxsplit=1, flags=re.IGNORECASE)
+        return list(dict.fromkeys([compact, *[p for p in parts if p.strip()]]))[:3]
 
     def rewrite(self, query: str) -> str:
         compact = " ".join(query.strip().split())

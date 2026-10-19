@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from pathlib import Path
+from typing import get_type_hints
 
 
 @dataclass(frozen=True)
 class Settings:
+    profile: str = "demo"
     project_name: str = "MedTutor Multimodal RAG Copilot"
     llm_provider: str = "mock"
     openai_api_key: str = ""
@@ -51,6 +53,29 @@ class Settings:
     index_path: Path = Path("data/indexes/vector_store.json")
     dense_index_path: Path = Path("data/indexes/dense_vectors.db")
     metadata_db_path: Path = Path("data/indexes/metadata.db")
+    ocr_provider: str = "none"
+    ocr_languages: tuple[str, ...] = ("vi", "en")
+    ocr_dpi: int = 160
+    ocr_max_pixels: int = 2_000_000
+    pdf_max_pages: int = 1000
+    pdf_max_pixels: int = 25_000_000
+    chunk_unit: str = "characters"
+    chunk_target_tokens: int = 500
+    chunk_overlap_tokens: int = 80
+    chunk_min_tokens: int = 100
+    chunk_max_tokens: int = 640
+    embedding_revision: str = "main"
+    dense_candidate_k: int = 40
+    sparse_candidate_k: int = 40
+    relevance_dense_threshold: float = 0.45
+    relevance_reranker_threshold: float = 0.5
+    context_window_tokens: int = 8192
+    context_output_reserve: int = 1024
+    answer_validation: str = "basic"
+    http_provider_url: str = ""
+    http_provider_key: str = ""
+    http_provider_timeout: int = 60
+    http_embedding_fingerprint: str = ""
 
 
 def _bool_env(name: str, default: bool) -> bool:
@@ -67,7 +92,7 @@ def _csv_env(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(item.strip() for item in value.split(",") if item.strip())
 
 
-def get_settings() -> Settings:
+def _legacy_settings() -> Settings:
     data_dir = Path(os.getenv("DATA_DIR", "data"))
     return Settings(
         llm_provider=os.getenv("LLM_PROVIDER", "mock"),
@@ -134,3 +159,93 @@ def get_settings() -> Settings:
         ),
         metadata_db_path=data_dir / "indexes" / "metadata.db",
     )
+
+
+PROFILE_DEFAULTS = {
+    "demo": {},
+    "local": {
+        "LLM_PROVIDER": "ollama",
+        "EMBEDDING_PROVIDER": "sentence-transformers",
+        "VECTOR_STORE_PROVIDER": "qdrant",
+        "RERANKER_PROVIDER": "cross-encoder",
+        "OCR_PROVIDER": "paddle",
+        "CHUNK_UNIT": "tokens",
+        "ANSWER_VALIDATION": "strict",
+    },
+    "cloud": {
+        "LLM_PROVIDER": "http",
+        "EMBEDDING_PROVIDER": "http",
+        "OCR_PROVIDER": "http",
+        "RERANKER_PROVIDER": "http",
+        "VECTOR_STORE_PROVIDER": "qdrant",
+        "CHUNK_UNIT": "tokens",
+        "ANSWER_VALIDATION": "strict",
+    },
+    "hybrid": {
+        "LLM_PROVIDER": "http",
+        "EMBEDDING_PROVIDER": "sentence-transformers",
+        "OCR_PROVIDER": "paddle",
+        "RERANKER_PROVIDER": "cross-encoder",
+        "VECTOR_STORE_PROVIDER": "qdrant",
+        "CHUNK_UNIT": "tokens",
+        "ANSWER_VALIDATION": "strict",
+    },
+}
+
+
+def resolve_profile(name: str, overrides: dict[str, str]) -> Settings:
+    if name not in PROFILE_DEFAULTS:
+        raise ValueError(f"Unknown RAG profile: {name}")
+    env = {**PROFILE_DEFAULTS[name], **{k: v for k, v in overrides.items() if v != ""}}
+    types = get_type_hints(Settings)
+    values = {"profile": name}
+    for item in fields(Settings):
+        value = env.get(item.name.upper())
+        if value is None or item.name == "profile":
+            continue
+        typ = types[item.name]
+        if typ is bool:
+            if value.lower() not in {"true", "false", "1", "0", "yes", "no", "on", "off"}:
+                raise ValueError(f"Invalid boolean: {item.name}")
+            values[item.name] = value.lower() in {"true", "1", "yes", "on"}
+        elif typ in (int, float, Path):
+            values[item.name] = typ(value)
+        elif item.name in {"frontend_origins", "ocr_languages"}:
+            values[item.name] = tuple(v.strip() for v in value.split(",") if v.strip())
+        else:
+            values[item.name] = value
+    data = Path(values.get("data_dir", "data"))
+    for key, filename in (
+        ("index_path", "vector_store.json"),
+        ("dense_index_path", "dense_vectors.db"),
+        ("metadata_db_path", "metadata.db"),
+    ):
+        values.setdefault(key, data / "indexes" / filename)
+    values["ollama_base_url"] = str(values.get("ollama_base_url", Settings.ollama_base_url)).rstrip("/")
+    settings = Settings(**values)
+    for key in (
+        "embedding_batch_size",
+        "embedding_dimension",
+        "chunk_size",
+        "pdf_max_pages",
+        "pdf_max_pixels",
+        "ocr_dpi",
+        "chunk_target_tokens",
+        "chunk_max_tokens",
+        "dense_candidate_k",
+        "sparse_candidate_k",
+        "ollama_num_predict",
+        "ocr_max_pixels",
+    ):
+        if getattr(settings, key) <= 0:
+            raise ValueError(f"{key} must be positive")
+    if not 0 <= settings.chunk_overlap_tokens < settings.chunk_target_tokens <= settings.chunk_max_tokens:
+        raise ValueError("Invalid token chunk window")
+    return settings
+
+
+def get_settings() -> Settings:
+    from dotenv import load_dotenv
+
+    load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
+    return resolve_profile(os.getenv("RAG_PROFILE", "demo"), dict(os.environ))

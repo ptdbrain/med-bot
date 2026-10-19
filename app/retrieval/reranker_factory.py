@@ -10,6 +10,10 @@ from app.retrieval.reranker import (
 
 def create_reranker(settings: Settings) -> Reranker:
     provider = settings.reranker_provider.strip().lower()
+    if provider == "http":
+        from app.retrieval.http_reranker import HTTPReranker
+
+        return HTTPReranker(settings)
     if provider in {"lexical", "local"}:
         return LexicalReranker(
             diversity_lambda=settings.reranker_diversity_lambda,

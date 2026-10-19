@@ -5,6 +5,7 @@ from app.llm.mock_llm import INSUFFICIENT_CONTEXT_MESSAGE
 from app.rag.naive_rag import RagOutput
 from app.rag.rag_fusion import reciprocal_rank_fusion
 from app.retrieval.bm25_store import BM25Store
+from app.retrieval.query_normalizer import normalize_query
 from app.retrieval.relevance import filter_relevant_results
 from app.retrieval.vector_store import VectorStore
 from app.safety.medical_guardrails import MedicalGuardrails
@@ -22,6 +23,8 @@ class HybridRAG:
         rrf_k: int = 60,
         dense_weight: float = 1.0,
         sparse_weight: float = 1.0,
+        dense_k: int = 40,
+        sparse_k: int = 40,
     ) -> None:
         self.vector_store = vector_store
         self.bm25_store = bm25_store
@@ -31,17 +34,25 @@ class HybridRAG:
         self.rrf_k = rrf_k
         self.dense_weight = dense_weight
         self.sparse_weight = sparse_weight
+        self.dense_k, self.sparse_k = dense_k, sparse_k
 
     def retrieve(self, question: str, top_k: int = 5) -> list[SearchResult]:
-        candidate_k = max(top_k, top_k * self.candidate_multiplier)
-        dense_results = self.vector_store.search(question, top_k=candidate_k, min_score=0.0)
-        sparse_results = self.bm25_store.search(question, top_k=candidate_k)
+        if top_k <= 0:
+            return []
+        return self.retrieve_candidates(question)[:top_k]
+
+    def retrieve_candidates(
+        self, question: str, dense_k: int | None = None, sparse_k: int | None = None
+    ) -> list[SearchResult]:
+        query = normalize_query(question)
+        dense_results = self.vector_store.search(query.dense_text, top_k=dense_k or self.dense_k, min_score=0.0)
+        sparse_results = self.bm25_store.search(query.sparse_text, top_k=sparse_k or self.sparse_k)
         return reciprocal_rank_fusion(
             [dense_results, sparse_results],
             k=self.rrf_k,
             weights=[self.dense_weight, self.sparse_weight],
             source_names=["dense", "sparse"],
-        )[:top_k]
+        )
 
     def answer(self, question: str, top_k: int = 5) -> RagOutput:
         safety = self.guardrails.check(question)

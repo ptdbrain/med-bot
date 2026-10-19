@@ -16,6 +16,32 @@ export interface IngestResult {
 
 export type MediaKind = "image" | "audio" | "video";
 
+export interface IngestJob {
+  job_id: string;
+  filename: string;
+  status: "queued" | "extracting" | "chunking" | "embedding" | "publishing" | "completed" | "needs_review" | "failed" | "cancelled";
+  report: Partial<IngestResult> & { page_count?: number; usable_pages?: number; failed_pages?: number; warning_pages?: number };
+  error: string | null;
+}
+
+export function createIngestJob(file: File) {
+  const body = new FormData();
+  body.append("file", file);
+  return apiRequest<IngestJob>("/ingest/jobs", { method: "POST", body });
+}
+
+export function getIngestJob(id: string) {
+  return apiRequest<IngestJob>(`/ingest/jobs/${encodeURIComponent(id)}`);
+}
+
+export function cancelIngestJob(id: string) {
+  return apiRequest<IngestJob>(`/ingest/jobs/${encodeURIComponent(id)}/cancel`, { method: "POST" });
+}
+
+export function retryIngestJob(id: string) {
+  return apiRequest<IngestJob>(`/ingest/jobs/${encodeURIComponent(id)}/retry`, { method: "POST" });
+}
+
 function upload(path: string, file: File) {
   const body = new FormData();
   body.append("file", file);

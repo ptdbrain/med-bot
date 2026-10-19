@@ -15,6 +15,10 @@ class BM25Store:
         self.b = b
         self._chunks: list[Chunk] = []
         self._tokens: dict[str, list[str]] = {}
+        self._postings: dict[str, dict[str, int]] = {}
+        self._lengths: dict[str, int] = {}
+        self._by_id: dict[str, Chunk] = {}
+        self._average_length = 0.0
 
     def add_chunks(self, chunks: list[Chunk]) -> None:
         known = {chunk.chunk_id for chunk in self._chunks}
@@ -24,6 +28,16 @@ class BM25Store:
             self._chunks.append(chunk)
             self._tokens[chunk.chunk_id] = tokenize(chunk_search_text(chunk))
             known.add(chunk.chunk_id)
+        self._rebuild_statistics()
+
+    def _rebuild_statistics(self):
+        self._postings = {}
+        self._by_id = {chunk.chunk_id: chunk for chunk in self._chunks}
+        self._lengths = {key: len(tokens) for key, tokens in self._tokens.items()}
+        self._average_length = sum(self._lengths.values()) / max(1, len(self._lengths))
+        for chunk_id, tokens in self._tokens.items():
+            for term, count in Counter(tokens).items():
+                self._postings.setdefault(term, {})[chunk_id] = count
 
     def replace_chunks(self, chunks: list[Chunk]) -> None:
         self._chunks = []
@@ -32,37 +46,18 @@ class BM25Store:
 
     def search(self, query: str, top_k: int = 5) -> list[SearchResult]:
         query_terms = set(tokenize(query))
-        if not query_terms or not self._chunks:
+        if not query_terms or not self._chunks or top_k <= 0:
             return []
-
-        document_frequency: Counter[str] = Counter()
-        lengths: list[int] = []
-        for chunk in self._chunks:
-            tokens = self._tokens[chunk.chunk_id]
-            document_frequency.update(set(tokens))
-            lengths.append(len(tokens))
-
         total_documents = len(self._chunks)
-        average_length = sum(lengths) / max(1, total_documents)
-        scored: list[SearchResult] = []
-        for chunk in self._chunks:
-            tokens = self._tokens[chunk.chunk_id]
-            counts = Counter(tokens)
-            document_length = len(tokens)
-            score = 0.0
-            for term in query_terms:
-                term_frequency = counts.get(term, 0)
-                if term_frequency == 0:
-                    continue
-                doc_frequency = document_frequency[term]
-                inverse_document_frequency = math.log(
-                    1 + (total_documents - doc_frequency + 0.5) / (doc_frequency + 0.5)
-                )
-                length_normalization = self.k1 * (1 - self.b + self.b * document_length / max(1.0, average_length))
-                score += inverse_document_frequency * (
-                    term_frequency * (self.k1 + 1) / (term_frequency + length_normalization)
-                )
-            if score > 0:
-                scored.append(SearchResult(chunk=chunk, score=round(score, 6)))
-        scored.sort(key=lambda item: item.score, reverse=True)
-        return scored[:top_k]
+        scores: Counter[str] = Counter()
+        for term in query_terms:
+            postings = self._postings.get(term, {})
+            frequency = len(postings)
+            idf = math.log(1 + (total_documents - frequency + 0.5) / (frequency + 0.5))
+            for chunk_id, tf in postings.items():
+                norm = self.k1 * (1 - self.b + self.b * self._lengths[chunk_id] / max(1.0, self._average_length))
+                scores[chunk_id] += idf * tf * (self.k1 + 1) / (tf + norm)
+        return [
+            SearchResult(self._by_id[key], round(value, 6))
+            for key, value in sorted(scores.items(), key=lambda item: (-item[1], item[0]))[:top_k]
+        ]

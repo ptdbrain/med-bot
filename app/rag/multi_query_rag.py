@@ -25,7 +25,7 @@ class MultiQueryRAG:
         self.candidate_multiplier = candidate_multiplier
 
     def retrieve(self, question: str, top_k: int = 5) -> list[SearchResult]:
-        queries = list(dict.fromkeys(self.query_transformer.expand(question)))
+        queries = list(dict.fromkeys(self.query_transformer.expand(question)))[:3]
         if not queries:
             return []
         candidate_k = max(top_k, top_k * self.candidate_multiplier)
