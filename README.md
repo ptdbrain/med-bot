@@ -540,13 +540,26 @@ document when content changes.
 
 ## Evaluation
 
+Runtime readiness and isolated real-embedding ingestion commands are documented
+in [the local RAG runbook](docs/runbooks/rag-local.md). `python -m scripts.doctor
+--profile local --json` distinguishes missing services, collection/model state,
+and configured providers. `/ready` is separate from `/health`. Use
+`python -m scripts.smoke_dense_ingest --json` for a new-directory SQLite dense
+Markdown smoke with a cached BGE-M3 model. Passing it does not certify Ollama,
+Qdrant, OCR, reranking, answer quality, or active-revision recovery.
+
 Run:
 
 ```bash
 python -m scripts.run_eval
 ```
 
-The evaluation dataset is at `app/evaluation/eval_dataset.json`.
+The evaluation dataset is at `app/evaluation/eval_dataset.json`. Run
+`python -m scripts.run_eval --split dev` for the current explicitly labeled
+`DRAFT` smoke run. Its six cases are not reviewed labels or a held-out
+benchmark; output also reports the configured providers. Use
+`python -m scripts.check_index --json` for a read-only check that fails on an
+empty index and compares chunk IDs, not just counts.
 
 Metrics included:
 
@@ -567,9 +580,10 @@ headings or four numbered answer blocks. Both are measured only on answerable
 cases; safety-blocked and insufficient-context cases are expected to have no
 citations.
 
-Latest local smoke snapshot (2026-07-31, six cases, not a clinical
-benchmark): Hit@5 `1.000`, MRR `0.833`, and `1.000` for citation, answer
-format, disclaimer, insufficient-context handling, and safety.
+Historical smoke snapshot (2026-07-31, six cases, not a reviewed benchmark):
+Hit@5 `1.000`, MRR `0.833`, and `1.000` for citation, answer format,
+disclaimer, insufficient-context handling, and safety. Do not treat it as a
+current release-quality result.
 
 ## Tests
 

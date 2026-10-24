@@ -1,5 +1,6 @@
 .env
 .venv/
+.venv-rag-quality/
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -8,6 +9,9 @@ data/raw/*
 data/processed/*
 data/indexes/*
 data/models/*
+data/.pytest-run-*/
+data/.pytest-runtime-*/
+data/.pytest-ready-*/
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !data/indexes/.gitkeep

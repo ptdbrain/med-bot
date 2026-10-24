@@ -12,11 +12,13 @@ class SentenceTransformerEmbedding(EmbeddingProvider):
         device: str = "cpu",
         batch_size: int = 8,
         model: Any | None = None,
+        local_files_only: bool = False,
     ) -> None:
         self.model_name = model_name
         self.device = device
         self.batch_size = batch_size
         self._model = model
+        self.local_files_only = local_files_only
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         if not texts:
@@ -42,7 +44,7 @@ class SentenceTransformerEmbedding(EmbeddingProvider):
             from sentence_transformers import SentenceTransformer
         except ImportError as exc:
             raise RuntimeError(
-                "Dense embedding cần sentence-transformers. " "Cài bằng: pip install -r requirements-rag.txt"
+                "Dense embedding cần sentence-transformers. Cài bằng: pip install -r requirements-rag.txt"
             ) from exc
-        self._model = SentenceTransformer(self.model_name, device=self.device)
+        self._model = SentenceTransformer(self.model_name, device=self.device, local_files_only=self.local_files_only)
         return self._model

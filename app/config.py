@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 
 @dataclass(frozen=True)
 class Settings:
+    profile_name: str = "demo"
     project_name: str = "MedTutor Multimodal RAG Copilot"
     llm_provider: str = "mock"
     openai_api_key: str = ""
@@ -53,6 +54,81 @@ class Settings:
     metadata_db_path: Path = Path("data/indexes/metadata.db")
 
 
+_PROFILE_DEFAULTS: dict[str, dict[str, object]] = {
+    "demo": {
+        "llm_provider": "mock",
+        "use_mock_llm": True,
+        "embedding_provider": "lexical",
+        "vector_store_provider": "memory",
+        "reranker_provider": "lexical",
+    },
+    "local": {
+        "llm_provider": "ollama",
+        "use_mock_llm": False,
+        "embedding_provider": "sentence-transformers",
+        "vector_store_provider": "qdrant",
+        "reranker_provider": "cross-encoder",
+    },
+}
+
+_PROFILE_ENV_FIELDS = {
+    "LLM_PROVIDER": "llm_provider",
+    "OLLAMA_BASE_URL": "ollama_base_url",
+    "OLLAMA_MODEL": "ollama_model",
+    "OLLAMA_TIMEOUT_SECONDS": "ollama_timeout_seconds",
+    "EMBEDDING_PROVIDER": "embedding_provider",
+    "EMBEDDING_MODEL": "embedding_model",
+    "EMBEDDING_DEVICE": "embedding_device",
+    "EMBEDDING_DIMENSION": "embedding_dimension",
+    "VECTOR_STORE_PROVIDER": "vector_store_provider",
+    "QDRANT_URL": "qdrant_url",
+    "QDRANT_COLLECTION": "qdrant_collection",
+    "RERANKER_PROVIDER": "reranker_provider",
+    "RERANKER_MODEL": "reranker_model",
+    "USE_MOCK_LLM": "use_mock_llm",
+    "DATA_DIR": "data_dir",
+    "DENSE_INDEX_PATH": "dense_index_path",
+}
+
+
+def _parse_profile_value(field_name: str, value: str) -> object:
+    if field_name in {"data_dir", "dense_index_path"}:
+        return Path(value)
+    if field_name == "use_mock_llm":
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    if field_name == "embedding_dimension":
+        return int(value)
+    if field_name == "ollama_timeout_seconds":
+        return int(value)
+    return value.rstrip("/") if field_name.endswith("_url") else value
+
+
+def resolve_profile(name: str, overrides: dict[str, str] | None = None) -> Settings:
+    profile = name.strip().lower()
+    if profile not in _PROFILE_DEFAULTS:
+        raise ValueError(f"Unknown profile '{name}'. Supported profiles: {', '.join(sorted(_PROFILE_DEFAULTS))}.")
+    unknown = set(overrides or {}) - _PROFILE_ENV_FIELDS.keys()
+    if unknown:
+        raise ValueError(f"Unknown profile override keys: {', '.join(sorted(unknown))}.")
+
+    values = dict(_PROFILE_DEFAULTS[profile])
+    for source in (os.environ, overrides or {}):
+        for env_name, field_name in _PROFILE_ENV_FIELDS.items():
+            value = source.get(env_name)
+            if value is not None and value.strip():
+                values[field_name] = _parse_profile_value(field_name, value)
+
+    if overrides and overrides.get("DATA_DIR"):
+        root = Path(overrides["DATA_DIR"])
+        values.update(
+            index_path=root / "indexes" / "vector_store.json",
+            metadata_db_path=root / "indexes" / "metadata.db",
+        )
+        if not overrides.get("DENSE_INDEX_PATH"):
+            values["dense_index_path"] = root / "indexes" / "dense_vectors.db"
+    return replace(_settings_from_environment(), profile_name=profile, **values)
+
+
 def _bool_env(name: str, default: bool) -> bool:
     value = os.getenv(name)
     if value is None:
@@ -68,6 +144,10 @@ def _csv_env(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
 
 
 def get_settings() -> Settings:
+    return resolve_profile(os.getenv("RAG_PROFILE", "demo"))
+
+
+def _settings_from_environment() -> Settings:
     data_dir = Path(os.getenv("DATA_DIR", "data"))
     return Settings(
         llm_provider=os.getenv("LLM_PROVIDER", "mock"),

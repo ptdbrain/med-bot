@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from app.config import Settings
 from app.embeddings.factory import create_embedding_provider
@@ -17,6 +19,13 @@ class FakeModel:
 
 
 class EmbeddingProviderTests(unittest.TestCase):
+    def test_offline_probe_loader_forbids_remote_downloads(self) -> None:
+        constructor = Mock(return_value=FakeModel())
+        with patch.dict("sys.modules", {"sentence_transformers": SimpleNamespace(SentenceTransformer=constructor)}):
+            provider = SentenceTransformerEmbedding(model_name="cached/model", local_files_only=True)
+            provider.embed_query("probe")
+        self.assertTrue(constructor.call_args.kwargs["local_files_only"])
+
     def test_sentence_transformer_normalizes_document_embeddings(self) -> None:
         model = FakeModel()
         provider = SentenceTransformerEmbedding(

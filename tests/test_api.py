@@ -1,7 +1,10 @@
+from unittest.mock import patch
+
 from fastapi.testclient import TestClient
 
 from app.config import Settings
 from app.main import create_app
+from app.runtime.doctor import RuntimeCheck
 
 
 def _test_settings(tmp_path):
@@ -81,3 +84,13 @@ def test_health_reports_active_rag_providers_and_vector_count(tmp_path):
     assert payload["embedding_provider"] == "lexical"
     assert payload["vector_store_provider"] == "memory"
     assert payload["reranker_provider"] == "lexical"
+
+
+def test_ready_returns_503_when_required_runtime_component_is_missing(tmp_path):
+    client = TestClient(create_app(_test_settings(tmp_path)))
+    with patch("app.api.health.check_runtime", return_value=[RuntimeCheck("qdrant", "missing", "offline")]):
+        response = client.get("/ready")
+
+    assert response.status_code == 503
+    assert response.json()["status"] == "not_ready"
+    assert response.json()["checks"][0]["name"] == "qdrant"
